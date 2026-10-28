@@ -59,7 +59,7 @@ export function Operations() {
                 <div className="listrow" key={op.id}>
                   <div className="main">
                     <div className="title">
-                      {kindLabel(op.kind)} {target ? <Link to={`/instances/${encodeURIComponent(target.auraId)}`}>{target.name}</Link> : "a new instance"}
+                      <Link to={`/operations/${encodeURIComponent(op.id)}`}>{kindLabel(op.kind)} {target ? target.name : "a new instance"}</Link>
                     </div>
                     <div className="sub" title={formatDate(op.createdAt)}>
                       {relativeTime(op.createdAt)}{took ? ` · took ${took}` : ""}{op.requestedBy ? ` · ${op.requestedBy}` : ""}{op.error ? ` · ${op.error}` : ""}

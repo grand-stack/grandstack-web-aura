@@ -24,6 +24,28 @@ export const DisconnectMutation = graphql(`
   mutation Disconnect { disconnectAura }
 `);
 
+export const PlanUpdateMutation = graphql(`
+  mutation PlanUpdate($instanceId: String!, $changes: InstanceChange!) {
+    planUpdate(instanceId: $instanceId, changes: $changes) { operationId }
+  }
+`);
+
+export const PlanPauseMutation = graphql(`
+  mutation PlanPause($instanceId: String!) { planPause(instanceId: $instanceId) { operationId } }
+`);
+
+export const PlanResumeMutation = graphql(`
+  mutation PlanResume($instanceId: String!) { planResume(instanceId: $instanceId) { operationId } }
+`);
+
+export const ConfirmMutation = graphql(`
+  mutation Confirm($id: ID!) { confirmOperation(operationId: $id) { operationId status } }
+`);
+
+export const CancelMutation = graphql(`
+  mutation Cancel($id: ID!) { cancelOperation(operationId: $id) }
+`);
+
 export const InstanceCardFields = graphql(`
   fragment InstanceCardFields on Instance {
     auraId name status statusGroup memory storage region createdAt deletedInAuraAt
@@ -87,6 +109,37 @@ export const DetailQuery = graphql(`
       hasStoredPassword credentialUsername passwordRevealCount
       operations(sort: [{ createdAt: DESC }]) { id kind status createdAt finishedAt error }
     }
+  }
+`);
+
+// One operation, for the review screen and then the progress screen. desired, before and diff are JSON text written by the aura subgraph.
+export const OperationQuery = graphql(`
+  query Operation($id: ID!) {
+    operations(where: { id: { eq: $id } }) {
+      id kind status error diff requestedBy createdAt confirmedAt finishedAt
+      target { auraId name }
+      steps(sort: [{ seq: ASC }]) { seq label status detail at }
+    }
+  }
+`);
+
+export const EditQuery = graphql(`
+  query Edit($id: String!) {
+    instances(where: { auraId: { eq: $id } }) {
+      auraId name status statusGroup memory storage region vectorOptimized graphAnalyticsPlugin deletedInAuraAt
+      tenant { auraId name }
+      cloud { name }
+      tier { type label }
+    }
+  }
+`);
+
+// The sizes this instance's tenant can create for its cloud, region and tier: the only ones the edit form offers
+export const SizeOptionsQuery = graphql(`
+  query SizeOptions($tenant: String!, $cloud: String!, $region: String!, $type: String!) {
+    instanceConfigurations(
+      where: { AND: [{ tenant: { some: { auraId: { eq: $tenant } } } }, { cloudProvider: { eq: $cloud } }, { region: { eq: $region } }, { type: { eq: $type } }] }
+    ) { memory storage }
   }
 `);
 

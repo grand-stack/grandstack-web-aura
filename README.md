@@ -6,16 +6,16 @@ Read [PLAN.md](PLAN.md) first. It holds the design, the graph model, the securit
 
 ## Status
 
-Phases 1 to 3 are built and tested. Creating, editing and deleting instances is next.
+Phases 1 to 4 are built and tested. You can edit, pause and resume an instance, each with a review and an explicit confirm. Creating and deleting instances is next (Phase 5).
 
 | Part | What it is | State |
 | --- | --- | --- |
 | [docs/aura_api_spec_v1-2.yaml](docs/aura_api_spec_v1-2.yaml) | The real Aura API v1 OpenAPI file | In the repo. REST types are generated from it |
 | [mock-aura/](mock-aura) | A fake Aura API for development and tests | Built. A contract test checks every response against the spec |
 | [store/](store) | The store subgraph: Neo4j graph, public read-only schema, internal read-write schema | Built, tested against a real Neo4j |
-| [aura/](aura) | The aura subgraph: connect, encrypted secret, token manager, sync into the store | Built, tested against a real Neo4j and mock-aura. Creating, editing and deleting instances is Phase 4 and 5 |
+| [aura/](aura) | The aura subgraph: connect, encrypted secret, token manager, sync into the store | Built, tested against a real Neo4j and mock-aura. Plans, confirms and reconciles edit, pause and resume. Create and delete are Phase 5 |
 | [gateway/](gateway) | Hive Gateway serving the composed supergraph | Built. No sign-in yet (Phase 6) |
-| [web/](web) | The React app: connect, gallery with filters, instance details, operations list, account page. Read-only | Built. Checked in a real browser on a phone and a desktop screen |
+| [web/](web) | The React app: connect, gallery with filters, instance details, edit, review and progress screens, operations list, account page | Built. Checked in a real browser on a phone and a desktop screen |
 
 ## Run it
 

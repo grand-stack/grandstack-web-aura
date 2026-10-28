@@ -9,6 +9,15 @@ export type ProjectDetail = components["schemas"]["Project"]["data"];
 export type ProjectSummary = components["schemas"]["ProjectSummary"];
 export type InstanceConfigurationData = ProjectDetail["instance_configurations"][number];
 
+/** What Aura's PATCH /instances/{id} accepts. Memory and storage are sent together by this app. */
+export interface InstanceUpdate {
+  name?: string;
+  memory?: string;
+  storage?: string;
+  vector_optimized?: boolean;
+  graph_analytics_plugin?: boolean;
+}
+
 export interface Problem {
   message: string;
   reason?: string;
@@ -132,12 +141,12 @@ export class AuraClient {
         return body.access_token;
       }
       if (res.status === 400 || res.status === 401 || res.status === 403) throw new AuraAuthError();
-      if (!(await this.shouldRetry(res, attempt))) throw new AuraApiError(res.status, await readProblems(res));
+      if (!(await this.shouldRetry(res, attempt, true))) throw new AuraApiError(res.status, await readProblems(res));
     }
   }
 
   /** Decides whether a 429 or 5xx is worth another go, and waits as asked. Returns false when retries are used up. */
-  private async shouldRetry(res: Response, attempt: number): Promise<boolean> {
+  private async shouldRetry(res: Response, attempt: number, retryServerErrors: boolean): Promise<boolean> {
     if (res.status === 429) {
       this.stats.rateLimited++;
       if (attempt >= this.maxRetries) return false;
@@ -147,7 +156,8 @@ export class AuraClient {
       this.stats.retries++;
       return true;
     }
-    if (res.status >= 500 && attempt < this.maxRetries) {
+    // A 5xx on a change may mean it was done. Reading again is harmless; doing a change again is not.
+    if (res.status >= 500 && retryServerErrors && attempt < this.maxRetries) {
       this.stats.retries++;
       await this.sleep(Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 250));
       return true;
@@ -170,6 +180,11 @@ export class AuraClient {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    return (await this.requestWithStatus<T>(method, path, body)).body;
+  }
+
+  /** Like request, but also says which success status came back (Aura's PATCH answers 200 or 202 depending on the change). */
+  private async requestWithStatus<T>(method: string, path: string, body?: unknown): Promise<{ status: number; body: T }> {
     let reauthenticated = false;
     for (let attempt = 0; ; attempt++) {
       await this.waitIfPaused();
@@ -180,7 +195,7 @@ export class AuraClient {
         headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
-      if (res.ok) return (await res.json()) as T;
+      if (res.ok) return { status: res.status, body: (await res.json().catch(() => ({}))) as T };
       // An expired or revoked token: get a fresh one once. If that fails too, the error is real.
       if ((res.status === 401 || res.status === 403) && !reauthenticated) {
         reauthenticated = true;
@@ -189,7 +204,7 @@ export class AuraClient {
         attempt--;
         continue;
       }
-      if (!(await this.shouldRetry(res, attempt))) throw new AuraApiError(res.status, await readProblems(res));
+      if (!(await this.shouldRetry(res, attempt, method === "GET"))) throw new AuraApiError(res.status, await readProblems(res));
     }
   }
 
@@ -209,6 +224,26 @@ export class AuraClient {
 
   async getInstance(instanceId: string): Promise<InstanceDetail> {
     return (await this.request<{ data: InstanceDetail }>("GET", `/instances/${encodeURIComponent(instanceId)}`)).data;
+  }
+
+  /**
+   * Rename, resize or change the switches. Aura answers 200 with the instance for a change it applied at once, and 202 with an
+   * empty body for one it carries out in the background (a resize). Either way the caller should then watch getInstance.
+   * Not retried after a server error or a lost connection: the change may have been made.
+   */
+  async updateInstance(instanceId: string, changes: InstanceUpdate): Promise<{ status: number; instance?: InstanceDetail }> {
+    const { status, body } = await this.requestWithStatus<{ data?: InstanceDetail }>("PATCH", `/instances/${encodeURIComponent(instanceId)}`, changes);
+    return { status, instance: body.data };
+  }
+
+  /** Starts a pause. Aura answers 202 with the instance in the "pausing" status. */
+  async pauseInstance(instanceId: string): Promise<InstanceDetail> {
+    return (await this.request<{ data: InstanceDetail }>("POST", `/instances/${encodeURIComponent(instanceId)}/pause`, {})).data;
+  }
+
+  /** Starts a resume. Aura answers 202 with the instance in the "resuming" status. */
+  async resumeInstance(instanceId: string): Promise<InstanceDetail> {
+    return (await this.request<{ data: InstanceDetail }>("POST", `/instances/${encodeURIComponent(instanceId)}/resume`, {})).data;
   }
 }
 

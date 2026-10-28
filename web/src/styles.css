@@ -231,3 +231,43 @@ dialog.modal[open] { display: flex; flex-direction: column; }
 .skeleton-line { height: 20px; }
 .emptystate { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 24px 16px; background: var(--card); border: 1px dashed var(--bd2); border-radius: var(--radius); }
 .emptystate h2 { font-size: 18px; }
+
+/* Changes: edit form, review, progress */
+.formpanel { padding: 0 0 4px; }
+.formpanel > h2, .formpanel > legend { padding: 12px 16px; font-size: 14px; font-weight: 700; color: var(--mu); border-bottom: 1px solid var(--bd); width: 100%; float: left; }
+.formpanel > legend + * { clear: both; }
+fieldset.formpanel { min-width: 0; margin: 0; }
+.formpanel .field { padding: 12px 16px 8px; }
+.counter { font-size: 12px; color: var(--mu); }
+.counter.bad { color: var(--dfg); font-weight: 600; }
+.formpanel .note { padding: 12px 16px 8px; clear: both; }
+.choice, .switchrow { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 16px; border-bottom: 1px solid var(--bd); cursor: pointer; }
+.choice:last-child, .switchrow:last-child { border-bottom: 0; }
+.choice.on { background: var(--infobg); }
+.choice input, .switchrow input { width: 22px; height: 22px; margin: 0; accent-color: var(--pr); flex-shrink: 0; }
+.choice .main, .switchrow .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.choice .title, .switchrow .title { font-size: 15px; font-weight: 600; }
+.choice .sub, .switchrow .sub { font-size: 13px; color: var(--mu); }
+.switchrow input { order: 2; width: 44px; }
+.actionbar { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
+.actionbar .btn { flex: 1 1 140px; }
+.actionbar.sticky { position: sticky; bottom: 0; z-index: 5; padding: 10px 0; background: var(--bg); }
+.actionbar .btn[aria-disabled="true"] { background: var(--sunk); color: var(--mu); cursor: not-allowed; }
+@media (min-width: 900px) { .actionbar { justify-content: flex-start; } .actionbar .btn { flex: 0 0 auto; } .actionbar.sticky { position: static; padding: 0; } }
+.diffrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--bd); }
+.diffrow:last-child { border-bottom: 0; }
+.diffrow .k { color: var(--mu); font-size: 14px; }
+.diffrow .v { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; flex-wrap: wrap; justify-content: flex-end; min-width: 0; overflow-wrap: anywhere; }
+.diffrow .before { color: var(--mu); text-decoration: line-through; }
+.diffrow .after { color: var(--tx); }
+.progresshead { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px 4px; font-size: 13px; }
+.timeline { list-style: none; margin: 0; padding: 8px 16px 12px; }
+.step { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; }
+.step .mark { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 12px; background: var(--sunk); color: var(--mu); flex-shrink: 0; }
+.step-done .mark { background: var(--okbg); color: var(--okfg); }
+.step-active .mark { background: var(--infobg); color: var(--infofg); }
+.step-failed .mark { background: var(--dbg); color: var(--dfg); }
+.step .main { display: flex; flex-direction: column; min-width: 0; }
+.step .title { font-size: 14px; font-weight: 600; }
+.step-pending .title { color: var(--mu); font-weight: 500; }
+.step .sub { font-size: 12px; color: var(--mu); overflow-wrap: anywhere; }

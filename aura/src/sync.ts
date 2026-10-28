@@ -60,7 +60,7 @@ export async function mapPool<T, R>(items: T[], limit: number, work: (item: T) =
 const chunks = <T>(items: T[], size = CHUNK): T[][] => Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
 
 /** Several update mutations in one request, each with its own variables. */
-async function updateMany(store: StoreClient, type: string, plural: string, items: { where: unknown; update: unknown }[]): Promise<void> {
+export async function updateMany(store: StoreClient, type: string, plural: string, items: { where: unknown; update: unknown }[]): Promise<void> {
   for (const group of chunks(items)) {
     const declarations = group.map((_, i) => `$w${i}: ${type}Where, $u${i}: ${type}UpdateInput`).join(", ");
     const calls = group.map((_, i) => `m${i}: update${plural}(where: $w${i}, update: $u${i}) { info { nodesCreated } }`).join("\n");
@@ -97,6 +97,13 @@ export function instanceProperties(detail: InstanceDetail, syncedAt: string) {
     createdAt: detail.created_at ?? null,
     syncedAt,
   };
+}
+
+/** Brings one instance's stored copy up to date from what Aura just reported. Tags and links are left as they are. */
+export async function refreshInstance(store: StoreClient, detail: InstanceDetail, syncedAt: string): Promise<void> {
+  await updateMany(store, "Instance", "Instances", [
+    { where: { auraId: { eq: detail.id } }, update: { ...setAll(instanceProperties(detail, syncedAt)), deletedInAuraAt: { set: null } } },
+  ]);
 }
 
 const withoutNulls = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined));

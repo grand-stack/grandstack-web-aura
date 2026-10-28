@@ -17,10 +17,25 @@ export interface MockAuraOptions {
   maxInstances?: number;
 }
 
+/**
+ * Ways to make the fake misbehave on purpose, so a client's failure handling can be tested. Never set by the real API's behaviour.
+ * They can be set in a test through `state.faults`, or over HTTP with POST /__faults (and cleared with DELETE /__faults).
+ */
+export interface Faults {
+  /** Answer the next change (POST, PATCH or DELETE on an instance) with this error instead of doing it. Used once. */
+  rejectNext?: { status: number; message: string; reason: string };
+  /** Finish every asynchronous change in this status instead of the usual one, for example "loading failed". */
+  endAs?: string;
+  /** Never finish: an instance that starts a change stays in the transitional status. */
+  stall?: boolean;
+  /** Answer the next change by cutting the connection after doing it, so the caller cannot tell whether it worked. Used once. */
+  dropNext?: boolean;
+}
+
 export interface MockAura {
   server: Server;
   /** The live state, for tests that need to look or arrange. */
-  state: { tenants: Tenant[]; instances: Map<string, Instance>; passwords: Map<string, string> };
+  state: { tenants: Tenant[]; instances: Map<string, Instance>; passwords: Map<string, string>; faults: Faults };
   /** Put the seed data back and forget all tokens and pending changes. For tests that share one mock. */
   reset(): void;
   listen(port?: number): Promise<number>;
@@ -54,6 +69,7 @@ export function createMockAura(options: MockAuraOptions = {}): MockAura {
     tenants: seedTenants(),
     instances: new Map(seedInstances().map((i) => [i.id, i])),
     passwords: new Map(),
+    faults: {},
   };
   const tokens = new Map<string, number>(); // token -> expiry (ms since epoch)
   const requestLog = new Map<string, number[]>(); // token -> request times
@@ -71,8 +87,9 @@ export function createMockAura(options: MockAuraOptions = {}): MockAura {
   const transition = (inst: Instance, during: string, after: string | null) => {
     inst.status = during;
     later(() => {
+      if (state.faults.stall) return;
       if (after === null) state.instances.delete(inst.id);
-      else inst.status = after;
+      else inst.status = state.faults.endAs ?? after;
     });
   };
 
@@ -180,17 +197,41 @@ export function createMockAura(options: MockAuraOptions = {}): MockAura {
     return config;
   };
 
-  const route = async (req: IncomingMessage, url: URL): Promise<{ status: number; body: unknown; headers?: Record<string, string> }> => {
+  const route = async (req: IncomingMessage, url: URL): Promise<{ status: number; body: unknown; headers?: Record<string, string>; drop?: boolean }> => {
     const method = req.method ?? "GET";
     const path = url.pathname;
 
     if (method === "POST" && path === "/oauth/token") return handleToken(req);
+
+    // Test controls, not part of the Aura API. They only exist in this fake.
+    if (path === "/__faults") {
+      if (method === "DELETE") state.faults = {};
+      else if (method === "POST") state.faults = parseJson(await readBody(req)) as Faults;
+      else throw middlewareError(404, "Not found");
+      return { status: 200, body: { faults: state.faults } };
+    }
 
     if (!path.startsWith("/v1/")) throw middlewareError(404, "Not found");
     authenticate(req);
     const parts = path.slice("/v1/".length).split("/").filter(Boolean);
     const [resource, id, action] = parts;
 
+    // A change can be refused outright, or done but with the answer lost (the connection is cut)
+    const isChange = resource === "instances" && (method === "POST" || method === "PATCH" || method === "DELETE") && id !== undefined && id !== "sizing";
+    if (isChange && state.faults.rejectNext) {
+      const { status, message, reason } = state.faults.rejectNext;
+      state.faults.rejectNext = undefined;
+      throw apiError(status, message, reason);
+    }
+    const dropAfter = isChange && state.faults.dropNext === true;
+    if (dropAfter) state.faults.dropNext = undefined;
+    const done = async () => {
+      const reply = await handle();
+      return dropAfter ? { ...reply, drop: true } : reply;
+    };
+    return done();
+
+    async function handle(): Promise<{ status: number; body: unknown; headers?: Record<string, string> }> {
     if (resource === "tenants") {
       if (method === "GET" && !id) return { status: 200, body: { data: state.tenants.map((t) => ({ id: t.id, name: t.name })) } };
       if (method === "GET" && id && !action) {
@@ -317,12 +358,17 @@ export function createMockAura(options: MockAuraOptions = {}): MockAura {
     }
 
     throw middlewareError(404, "Not found");
+    }
   };
 
   const server = createServer((req, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     route(req, url)
-      .then(({ status, body, headers }) => send(res, status, body, headers))
+      .then(({ status, body, headers, drop }) => {
+        // The change was made, but the caller never hears about it
+        if (drop) req.socket.destroy();
+        else send(res, status, body, headers);
+      })
       .catch((err: unknown) => {
         if (err instanceof HttpError) send(res, err.status, err.body, err.headers);
         else send(res, 500, { error: "Internal Server Error" });
@@ -343,6 +389,7 @@ export function createMockAura(options: MockAuraOptions = {}): MockAura {
       state.tenants = seedTenants();
       state.instances = new Map(seedInstances().map((i) => [i.id, i]));
       state.passwords = new Map();
+      state.faults = {};
       requestLog.clear();
     },
     listen: (port = 0) =>

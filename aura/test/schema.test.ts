@@ -51,6 +51,58 @@ describe("mutations", () => {
   });
 });
 
+describe("planning and confirming changes", () => {
+  const planned = { operationId: "op-1" };
+  const withOps = (over: Record<string, unknown> = {}) => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    const record = (method: string, result: unknown) => async (...args: unknown[]) => (calls.push({ method, args }), result);
+    const operations = {
+      plan: record("plan", planned),
+      confirm: record("confirm", { operationId: "op-1", status: "CONFIRMED" }),
+      cancel: record("cancel", undefined),
+      ...over,
+    };
+    return { ...fake({ operations } as never), calls };
+  };
+
+  it("plans an update with the changes it was given", async () => {
+    const { run, calls } = withOps();
+    const res = await run(`mutation($c: InstanceChange!) { planUpdate(instanceId: "i1", changes: $c) { operationId } }`, { c: { name: "n", memory: "8GB", storage: "16GB", vectorOptimized: true } });
+    expect(res.data.planUpdate).toEqual({ operationId: "op-1" });
+    expect(calls).toEqual([{ method: "plan", args: ["UPDATE", "i1", { name: "n", memory: "8GB", storage: "16GB", vectorOptimized: true }] }]);
+  });
+  it("plans a pause and a resume", async () => {
+    const { run, calls } = withOps();
+    await run(`mutation { planPause(instanceId: "i1") { operationId } }`);
+    await run(`mutation { planResume(instanceId: "i2") { operationId } }`);
+    expect(calls.map((c) => c.args)).toEqual([["PAUSE", "i1"], ["RESUME", "i2"]]);
+  });
+  it("confirms and cancels", async () => {
+    const { run, calls } = withOps();
+    expect((await run(`mutation { confirmOperation(operationId: "op-1") { operationId status } }`)).data.confirmOperation).toEqual({ operationId: "op-1", status: "CONFIRMED" });
+    expect((await run(`mutation { cancelOperation(operationId: "op-1") }`)).data.cancelOperation).toBe(true);
+    expect(calls.map((c) => c.method)).toEqual(["confirm", "cancel"]);
+  });
+  it("shows the person the reason a plan or a confirmation was refused", async () => {
+    const { run } = withOps({ plan: async () => { throw new UserError("Nothing would change."); }, confirm: async () => { throw new UserError("This change was already confirmed."); } });
+    expect((await run(`mutation { planPause(instanceId: "i") { operationId } }`)).errors![0]!.message).toBe("Nothing would change.");
+    expect((await run(`mutation { confirmOperation(operationId: "o") { status } }`)).errors![0]!.message).toBe("This change was already confirmed.");
+  });
+  it("hides an unexpected failure while planning", async () => {
+    const { run } = withOps({ plan: async () => { throw new Error("neo4j://db password=hunter2"); } });
+    const res = await run(`mutation { planPause(instanceId: "i") { operationId } }`);
+    expect(JSON.stringify(res)).not.toContain("hunter2");
+  });
+  it("does not accept a field Aura cannot change", async () => {
+    const { run } = withOps();
+    const res = await run(`mutation { planUpdate(instanceId: "i", changes: { type: "enterprise-db" }) { operationId } }`);
+    expect(res.errors).toBeDefined();
+  });
+  it("has nothing that deletes or creates yet", () => {
+    expect(typeDefs).not.toMatch(/planDelete|planCreate|deleteInstance|createInstance/);
+  });
+});
+
 describe("errors", () => {
   it("shows the person a UserError's message", async () => {
     const { run } = fake({ connect: async () => { throw new UserError("Aura rejected that client id and secret. Check them in the Aura Console."); } });

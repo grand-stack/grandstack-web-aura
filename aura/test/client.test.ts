@@ -201,6 +201,83 @@ describe("server errors", () => {
   });
 });
 
+describe("changing an instance", () => {
+  const instance = { id: "i1", name: "x", status: "updating" };
+  const apiCalls = (t: { calls: { url: string; init: RequestInit }[] }) => t.calls.filter((c) => c.url.includes("/v1/"));
+
+  it("sends a PATCH with the changes as JSON, and reports 202 for a change Aura carries out in the background", async () => {
+    const t = make([token(), json(202, {})]);
+    expect(await t.client.updateInstance("i1", { memory: "8GB", storage: "16GB" })).toEqual({ status: 202, instance: undefined });
+    const [call] = apiCalls(t);
+    expect(call!.url).toBe("https://aura.test/v1/instances/i1");
+    expect(call!.init.method).toBe("PATCH");
+    expect((call!.init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(call!.init.body as string)).toEqual({ memory: "8GB", storage: "16GB" });
+  });
+
+  it("reports 200 with the instance for a change Aura applied at once", async () => {
+    const t = make([token(), json(200, { data: instance })]);
+    expect(await t.client.updateInstance("i1", { name: "x" })).toEqual({ status: 200, instance });
+  });
+
+  it.each([["pauseInstance", "pause"], ["resumeInstance", "resume"]] as const)("%s posts an empty JSON body to the right path", async (method, path) => {
+    const t = make([token(), json(202, { data: instance })]);
+    expect(await t.client[method]("i1")).toEqual(instance);
+    const [call] = apiCalls(t);
+    expect(call!.url).toBe(`https://aura.test/v1/instances/i1/${path}`);
+    expect(call!.init.method).toBe("POST");
+    expect(call!.init.body).toBe("{}");
+    expect((call!.init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+  });
+
+  it("does NOT retry a change after a server error: it may have been made, and doing it twice is not harmless", async () => {
+    const t = make([token(), json(503, { error: "down" })]);
+    await expect(t.client.updateInstance("i1", { name: "x" })).rejects.toMatchObject({ status: 503 });
+    expect(apiCalls(t)).toHaveLength(1);
+    expect(t.sleeps).toEqual([]);
+    const p = make([token(), json(500, { error: "boom" })]);
+    await expect(p.client.pauseInstance("i1")).rejects.toMatchObject({ status: 500 });
+    expect(apiCalls(p)).toHaveLength(1);
+  });
+
+  it("does retry a read after a server error, as before", async () => {
+    const t = make([token(), json(503, { error: "down" }), json(200, { data: instance })]);
+    expect(await t.client.getInstance("i1")).toEqual(instance);
+    expect(apiCalls(t)).toHaveLength(2);
+  });
+
+  it("does retry a change that was refused for rate limiting, because refused means not done", async () => {
+    const t = make([token(), json(429, { error: "slow" }, { "Retry-After": "2" }), json(202, {})]);
+    expect((await t.client.updateInstance("i1", { name: "x" })).status).toBe(202);
+    expect(apiCalls(t)).toHaveLength(2);
+    expect(t.sleeps).toEqual([2000]);
+  });
+
+  it("does retry a change once with a fresh token when the token was refused", async () => {
+    const t = make([token("old"), json(403, { error: "expired" }), token("new"), json(202, {})]);
+    expect((await t.client.updateInstance("i1", { name: "x" })).status).toBe(202);
+  });
+
+  it("does not retry a change when the connection is lost: it cannot tell whether it was made", async () => {
+    let sent = 0;
+    const failing = (async (url: string) => {
+      if (String(url).includes("/oauth/token")) return token();
+      sent++;
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const t = make([], { fetch: failing });
+    await expect(t.client.pauseInstance("i1")).rejects.toBeInstanceOf(AuraUnreachableError);
+    expect(sent).toBe(1);
+  });
+
+  it("passes on Aura's reason for a 409 and a 400", async () => {
+    const conflict = make([token(), json(409, { errors: [{ message: "The database is current undergoing an operation: updating", reason: "ongoing-database-operation" }] })]);
+    await expect(conflict.client.pauseInstance("i1")).rejects.toMatchObject({ status: 409, problems: [{ reason: "ongoing-database-operation" }] });
+    const bad = make([token(), json(400, { errors: [{ message: "memory is invalid", reason: "invalid-request", field: "memory" }] })]);
+    await expect(bad.client.updateInstance("i1", { memory: "x" })).rejects.toMatchObject({ status: 400, problems: [{ field: "memory" }] });
+  });
+});
+
 describe("an unreachable Aura", () => {
   it("is reported as unreachable, without the address or the underlying error", async () => {
     const failing = (async () => {

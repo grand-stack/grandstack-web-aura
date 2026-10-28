@@ -20,6 +20,7 @@ const service = new AuraService({
   auraBaseUrl: config.auraBaseUrl,
   syncConcurrency: config.syncConcurrency,
   syncIntervalMs: config.syncIntervalMs,
+  operationTimeoutMs: config.operationTimeoutMs,
   secrets: new SecretStore(driver, config.neo4jDatabase, box),
   store: new StoreClient(config.storeInternalUrl, config.internalToken),
 });
@@ -36,6 +37,6 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     service.stop();
     server.close();
-    void service.idle().finally(() => driver.close().finally(() => process.exit(0)));
+    void Promise.all([service.idle(), service.operations.idle()]).finally(() => driver.close().finally(() => process.exit(0)));
   });
 }

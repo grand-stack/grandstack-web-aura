@@ -20,6 +20,8 @@ export interface Config {
   syncIntervalMs: number;
   /** How many instance detail requests run at once during a sync. */
   syncConcurrency: number;
+  /** How long a change may take before it is given up on. The change may still finish; the next sync shows it. */
+  operationTimeoutMs: number;
   /** The one account version 1 supports. */
   accountId: string;
 }
@@ -72,6 +74,7 @@ export function loadConfig(env: Env = process.env): Config {
     auraBaseUrl,
     syncIntervalMs: integer(env, "SYNC_INTERVAL_MS", 15 * 60_000, 0, 24 * 3_600_000),
     syncConcurrency: integer(env, "SYNC_CONCURRENCY", 3, 1, 20),
+    operationTimeoutMs: integer(env, "OPERATION_TIMEOUT_MS", 30 * 60_000, 1000, 24 * 3_600_000),
     accountId: "default",
   };
 }

@@ -9,8 +9,10 @@ import { relativeTime } from "./lib/format";
 import { applyTheme, loadTheme, nextTheme, saveTheme, type Theme } from "./lib/theme";
 import { Account } from "./pages/Account";
 import { Detail } from "./pages/Detail";
+import { Edit } from "./pages/Edit";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
+import { OperationPage } from "./pages/OperationPage";
 import { Operations } from "./pages/Operations";
 import { Results } from "./pages/Results";
 import { FirstSync, SetupPage } from "./pages/Setup";
@@ -119,7 +121,9 @@ export function App() {
           <Route path="/" element={<Home />} />
           <Route path="/instances" element={<Results />} />
           <Route path="/instances/:id" element={<Detail />} />
+          <Route path="/instances/:id/edit" element={<Edit />} />
           <Route path="/operations" element={<Operations />} />
+          <Route path="/operations/:id" element={<OperationPage />} />
           <Route path="/account" element={<Account />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

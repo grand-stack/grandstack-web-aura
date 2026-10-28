@@ -157,6 +157,30 @@ type SyncStart @join__type(graph: AURA)  {
   syncRunId: ID!
 }
 
+"""
+A change that has been planned and is waiting for review. Nothing has been sent to Aura.
+"""
+type PlannedChange @join__type(graph: AURA)  {
+  """
+  The operation to review in the store, and then confirm or cancel.
+  """
+  operationId: ID!
+}
+
+"""
+A change that has been confirmed. It is now being carried out; follow it through the operation in the store.
+"""
+type ConfirmedChange @join__type(graph: AURA)  {
+  """
+  The operation.
+  """
+  operationId: ID!
+  """
+  Its status right after confirming, which is CONFIRMED.
+  """
+  status: String!
+}
+
 type Query @join__type(graph: AURA)  @join__type(graph: STORE)  {
   """
   The state of the connection to Aura.
@@ -227,6 +251,28 @@ type Mutation @join__type(graph: AURA)  {
   Aura. Connect again to resume.
   """
   disconnectAura: Boolean!
+  """
+  Plan a rename, resize or switch change on a running instance. This only records the plan, with what would change, for review.
+  Nothing is sent to Aura until confirmOperation.
+  """
+  planUpdate(instanceId: String!, changes: InstanceChange!) : PlannedChange!
+  """
+  Plan pausing a running instance. Nothing is sent to Aura until confirmOperation.
+  """
+  planPause(instanceId: String!) : PlannedChange!
+  """
+  Plan resuming a paused instance. Nothing is sent to Aura until confirmOperation.
+  """
+  planResume(instanceId: String!) : PlannedChange!
+  """
+  Confirm a planned change: send it to Aura, once, and watch until the instance shows it. Refused if the instance changed since it
+  was planned, if another change is under way for it, or if it was already confirmed or cancelled.
+  """
+  confirmOperation(operationId: ID!) : ConfirmedChange!
+  """
+  Withdraw a planned change before it is sent. Refused once it has been confirmed.
+  """
+  cancelOperation(operationId: ID!) : Boolean!
 }
 
 """
@@ -1542,6 +1588,32 @@ enum SyncStatus @join__type(graph: STORE)  {
   Stopped with an error.
   """
   FAILED @join__enumValue(graph: STORE) 
+}
+
+"""
+What to change on an instance. Send only what you want changed. Memory and storage go together, as one of the pairs the tenant is offered.
+"""
+input InstanceChange @join__type(graph: AURA)  {
+  """
+  A new name, 1 to 30 characters.
+  """
+  name: String
+  """
+  A new memory, for example 16GB. Needs storage too.
+  """
+  memory: String
+  """
+  The storage that goes with the memory, for example 32GB.
+  """
+  storage: String
+  """
+  Turn vector optimization on or off.
+  """
+  vectorOptimized: Boolean
+  """
+  Turn the Graph Analytics plugin on or off.
+  """
+  graphAnalyticsPlugin: Boolean
 }
 
 input AuraAccountRelationshipFilters @join__type(graph: STORE)  {

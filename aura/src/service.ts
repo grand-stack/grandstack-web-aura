@@ -1,18 +1,14 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
-import { GraphQLError } from "graphql";
 import { AuraAuthError, AuraClient } from "./client.js";
+import { UserError } from "./errors.js";
 import type { SecretStore } from "./secrets.js";
+import { OperationService } from "./operations/service.js";
 import { maskClientId } from "./status.js";
 import type { StoreClient } from "./storeClient.js";
 import { startSync, type SyncResult } from "./sync.js";
 
-/** A problem the person can act on. Its message is shown to them, so it never contains a secret. */
-export class UserError extends GraphQLError {
-  constructor(message: string) {
-    super(message, { extensions: { code: "USER_ERROR" } });
-  }
-}
+export { UserError };
 
 export interface AuraSetup {
   /** True until credentials are stored. The interface shows only the connect form. */
@@ -36,6 +32,10 @@ export interface ServiceOptions {
   fetch?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
+  /** How long to wait before the nth look at an instance a change is waiting on. Short in tests. */
+  operationPollDelayMs?: (attempt: number) => number;
+  /** How long a change may take before it is given up on. Default 30 minutes. */
+  operationTimeoutMs?: number;
 }
 
 const iso = (d: Date) => d.toISOString();
@@ -46,7 +46,20 @@ export class AuraService {
   private running: { runId: string; done: Promise<SyncResult> } | undefined;
   private timer: NodeJS.Timeout | undefined;
 
-  constructor(private readonly o: ServiceOptions) {}
+  /** Plan, confirm and cancel changes to instances. */
+  readonly operations: OperationService;
+
+  constructor(private readonly o: ServiceOptions) {
+    this.operations = new OperationService({
+      store: o.store,
+      client: () => this.auraClient(),
+      isConnected: () => o.secrets.hasAuraSecret(o.accountId),
+      now: o.now,
+      sleep: o.sleep,
+      pollDelayMs: o.operationPollDelayMs,
+      timeoutMs: o.operationTimeoutMs,
+    });
+  }
 
   private now(): Date {
     return (this.o.now ?? (() => new Date()))();
@@ -180,6 +193,12 @@ export class AuraService {
     if (this.o.syncIntervalMs > 0) {
       this.timer = setInterval(() => void this.tick(), this.o.syncIntervalMs);
       this.timer.unref();
+    }
+    // Pick up any change a restart interrupted, then sync
+    try {
+      await this.operations.recover();
+    } catch (err) {
+      console.error(`Could not resume interrupted changes: ${err instanceof Error ? err.name : "error"}`);
     }
     await this.tick();
   }

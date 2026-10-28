@@ -50,7 +50,7 @@ async function freshPage(viewport = DESKTOP, relaunch = false) {
   page.on("requestfailed", (r) => { if (r.failure()?.errorText !== "net::ERR_ABORTED") problems.push(`requestfailed: ${r.failure()?.errorText} ${r.url().slice(0, 80)}`); });
 }
 async function open(path, viewport) {
-  if (viewport) await freshPage(viewport, ++loads > 6);
+  if (viewport) await freshPage(viewport, ++loads > 4);
   await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
 }
 
@@ -249,7 +249,7 @@ check("properties: tenant, tier, region, size, created", await page.evaluate(() 
 check("tags on the page lead back to filtered lists", await page.$$eval(".meta .tag", (a) => a.map((x) => x.getAttribute("href")).every((h) => h.startsWith("/instances?"))));
 await page.click(".copyrow .iconbtn");
 check("copying says so", await waitFor(() => /copied/i.test(document.querySelector(".copyrow .iconbtn")?.getAttribute("aria-label") ?? "")));
-check("the detail page offers no change buttons yet", (await count("button.btn-danger, a[href*='edit']")) === 0);
+check("the detail page offers no delete button yet", (await count("button.btn-danger")) === 0);
 check("detail fits a phone", !(await overflowing()));
 await accessibility("detail");
 await shot("07-detail-mobile");
@@ -271,7 +271,8 @@ check("Sync now refreshes the copy: the removed instance leaves the home page", 
 check("the removed instance has gone from 'Needs attention'", (await count("section[aria-label='Needs attention']")) === 0);
 check("the top bar says when it last synced", /Synced (just now|a minute ago)/.test((await text(".synced")) ?? ""), await text(".synced"));
 await open("/instances?rm=1", DESKTOP);
-check("'including removed' shows it again, marked", (await waitText(".countline", "6 instances")) && (await texts(".cards .card .status")).includes("Removed from Aura"), (await texts(".cards .card .status")).join("|"));
+const sixShown = await waitText(".countline", "6 instances");
+check("'including removed' shows it again, marked", sixShown && (await texts(".cards .card .status")).includes("Removed from Aura"), (await texts(".cards .card .status")).join("|"));
 await open("/instances/e5f6a7b8", DESKTOP);
 check("its page explains it is gone and keeps the record", await waitText(".banner-warn", "no longer in Aura"));
 await shot("09-detail-removed");
@@ -281,6 +282,127 @@ await open("/operations", PHONE);
 check("operations is empty before any change is planned", await waitText(".emptystate h2", "No changes yet"));
 check("operations fits a phone", !(await overflowing()));
 await accessibility("operations");
+
+// ───────────────────────────── 7b. Changing an instance: plan, review, confirm, progress ─────────────────────────────
+const auraGet = async (id) => (await (await fetch(`${MOCK}/v1/instances/${id}`, { headers: { Authorization: `Bearer ${await auraToken()}` } })).json()).data;
+const auraPatch = (id, body) => auraToken().then((t) => fetch(`${MOCK}/v1/instances/${id}`, { method: "PATCH", headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+const setFaults = (faults) => fetch(`${MOCK}/__faults`, { method: faults ? "POST" : "DELETE", headers: { "Content-Type": "application/json" }, body: faults ? JSON.stringify(faults) : undefined });
+const until = async (fn, ms = 20000) => { for (let t = 0; t < ms; t += 500) { if (await fn()) return true; await sleep(500); } return false; };
+const syncAndWait = async () => {
+  await gql(`mutation { syncNow { started } }`);
+  await sleep(500);
+  for (let i = 0; i < 60; i++) { if (!(await gql(`{ auraSetup { syncing } }`)).auraSetup.syncing) return; await sleep(500); }
+};
+
+// Edit: rename and resize recs-staging on a phone
+await open("/instances/c9d8e7f6", PHONE);
+await waitText("h1", "recs-staging");
+check("a running instance offers Edit and Pause, not Resume", (await texts(".actionbar .btn")).join("|") === "Edit|Pause", (await texts(".actionbar .btn")).join("|"));
+await page.click(".actionbar a[href$='/edit']");
+check("the edit form opens", await waitText("h1", "Edit recs-staging"));
+check("Review changes is off until something differs", await page.$eval(".actionbar button[type=submit]", (b) => b.disabled));
+check("the name counter counts characters", (await text("#name-count")) === "12 of 30", await text("#name-count"));
+await typeInto("#name", "x".repeat(31));
+check("a name over 30 characters is refused on the form", (await waitText("#name-count", "at most 30")) && (await page.$eval(".actionbar button[type=submit]", (b) => b.disabled)));
+await typeInto("#name", "recs-v2");
+await waitFor(() => document.querySelectorAll("input[name=size]").length >= 2);
+check("the instance's own size is marked current", (await texts(".choice .tag")).join("|") === "Current", (await texts(".choice .tag")).join("|"));
+check("only sizes the tenant can use are offered", (await count("input[name=size]")) >= 2);
+await page.evaluate(() => { const radios = [...document.querySelectorAll("input[name=size]")]; radios.find((r) => !r.checked).click(); });
+check("Review changes turns on once something differs", await waitFor(() => !document.querySelector(".actionbar button[type=submit]").disabled));
+check("the edit form fits a phone", !(await overflowing()));
+await accessibility("edit");
+await shot("70-edit-mobile");
+const auraBefore = await auraGet("c9d8e7f6");
+await page.click(".actionbar button[type=submit]");
+check("review opens on the review page, planned and not sent", (await waitText("h1", "recs-staging")) && (await waitText(".status", "Planned, not sent")) && url().pathname.startsWith("/operations/"), url().pathname);
+check("the review shows each thing that changes", (await texts(".diffrow .k")).join("|") === "Name|Memory|Storage", (await texts(".diffrow .k")).join("|"));
+check("the review shows before and after", (await texts(".diffrow")).some((t) => t.includes("recs-staging") && t.includes("recs-v2")));
+check("the review warns before a resize", await count(".banner-warn") >= 1);
+check("planning sent nothing to Aura", JSON.stringify(await auraGet("c9d8e7f6")) === JSON.stringify(auraBefore));
+check("the review fits a phone", !(await overflowing()));
+await accessibility("review");
+await shot("71-review-mobile");
+const reviewUrl = page.url();
+await clickByText("button", "Confirm and apply");
+check("confirming shows progress", await waitText(".status", "In progress") || await waitText(".status", "Confirmed"));
+check("progress lists six steps", (await count(".timeline .step")) === 6, String(await count(".timeline .step")));
+check("progress shows the step number and a clock", await waitText(".progresshead", "of 6"));
+check("Aura has the change by now", await until(async () => (await auraGet("c9d8e7f6")).name === "recs-v2"), (await auraGet("c9d8e7f6")).name);
+await shot("72-progress-mobile");
+check("the operation finishes", await waitText(".status", "Succeeded", 60000));
+check("it says it is done", await waitText(".banner", "Done"));
+check("every step is done", (await count(".timeline .step-done")) === 6, String(await count(".timeline .step-done")));
+await shot("73-succeeded-mobile");
+await page.goto(reviewUrl, { waitUntil: "domcontentloaded" });
+check("reloading the page shows the finished change", await waitText(".status", "Succeeded"));
+await open("/instances/c9d8e7f6", DESKTOP);
+check("the instance shows the new name, size and a link to the change", (await waitText("h1", "recs-v2")) && (await count(".panel .listrow a[href^='/operations/']")) >= 1);
+check("the stored instance matches Aura", (await gql(`{ instances(where: { auraId: { eq: "c9d8e7f6" } }) { name memory storage } }`)).instances[0].name === "recs-v2");
+
+// Pause: cancelling sends nothing; confirming pauses; Resume brings it back
+await open("/instances/d4e5f6a7", DESKTOP);
+await waitText("h1", "billing-staging");
+await clickByText("button", "Pause");
+check("pause opens a review", (await waitText(".status", "Planned, not sent")) && (await waitText(".diffrow", "Paused")));
+check("the pause review warns that connections will fail", await waitText(".banner-warn", "connections"));
+await clickByText("button", "Cancel");
+check("cancelling says nothing was sent", await waitText(".banner", "Nothing was sent to Aura"));
+check("a cancelled pause left the instance running", (await auraGet("d4e5f6a7")).status === "running");
+await open("/instances/d4e5f6a7", DESKTOP);
+await waitText("h1", "billing-staging");
+await waitFor(() => [...document.querySelectorAll(".actionbar button")].some((b) => b.textContent.trim() === "Pause" && !b.disabled));
+await clickByText("button", "Pause");
+await waitText(".status", "Planned, not sent");
+await clickByText("button", "Confirm and apply");
+check("the pause succeeds", await waitText(".status", "Succeeded", 60000));
+await open("/instances/d4e5f6a7", DESKTOP);
+await waitText("h1", "billing-staging");
+check("a paused instance offers Resume, not Pause", (await texts(".actionbar .btn")).join("|") === "Edit|Resume", (await texts(".actionbar .btn")).join("|"));
+await clickByText("button", "Resume");
+await waitText(".status", "Planned, not sent");
+await clickByText("button", "Confirm and apply");
+check("the resume succeeds", await waitText(".status", "Succeeded", 60000));
+check("Aura has it running again", (await auraGet("d4e5f6a7")).status === "running");
+
+// Actions are locked while a change is in progress
+const locking = (await gql(`mutation($id: String!) { planUpdate(instanceId: $id, changes: { name: "search-v2" }) { operationId } }`, { id: "c3d4e5f6" })).planUpdate.operationId;
+await gql(`mutation($id: ID!) { confirmOperation(operationId: $id) { status } }`, { id: locking });
+await open("/instances/c3d4e5f6", DESKTOP);
+check("an active change shows a banner linking to it", await waitText(".banner-info", "A change is in progress"));
+check("Edit, Pause are locked meanwhile", (await page.$$eval(".actionbar [aria-disabled=true], .actionbar button:disabled", (els) => els.length)) >= 2);
+check("the active change is on the Operations page as active", (await (async () => { await open("/operations", DESKTOP); await waitText(".tagrow", "Active"); return texts(".tagrow .tag"); })()).some((t) => t.startsWith("Active · 1")));
+await page.goto(`${BASE}/operations/${locking}`, { waitUntil: "domcontentloaded" });
+check("it finishes", await waitText(".status", "Succeeded", 60000));
+
+// A refusal from Aura is shown as a failure with the reason
+const failing = (await gql(`mutation($id: String!) { planUpdate(instanceId: $id, changes: { name: "orders-v2" }) { operationId } }`, { id: "a1b2c3d4" })).planUpdate.operationId;
+await setFaults({ rejectNext: { status: 409, message: "Another operation is in progress", reason: "instance-busy" } });
+await open(`/operations/${failing}`, DESKTOP);
+await waitText(".status", "Planned, not sent");
+await clickByText("button", "Confirm and apply");
+check("a refused change shows as failed", await waitText(".status", "Failed", 30000));
+check("the failure says why and offers Sync now", (await waitText(".banner-danger", "already working")) && (await texts(".actionbar button")).includes("Sync now"));
+await shot("74-failed-desktop");
+await setFaults(null);
+
+// A plan goes stale if the instance changes before it is confirmed
+const stale = (await gql(`mutation($id: String!) { planUpdate(instanceId: $id, changes: { name: "orders-stale" }) { operationId } }`, { id: "a1b2c3d4" })).planUpdate.operationId;
+await auraPatch("a1b2c3d4", { name: "orders-elsewhere" });
+await sleep(4500);
+await syncAndWait();
+await open(`/operations/${stale}`, DESKTOP);
+await waitText(".status", "Planned, not sent");
+await clickByText("button", "Confirm and apply");
+check("a stale plan is refused with a way out", (await waitText(".banner-danger", "Plan the change again")) && (await count(".banner-danger a")) >= 1);
+check("a stale plan sent nothing to Aura", (await auraGet("a1b2c3d4")).name === "orders-elsewhere");
+await open("/operations/not-a-real-id", DESKTOP);
+check("an unknown change says so", await waitText(".emptystate h2", "No change with that id"));
+await open("/operations", PHONE);
+await waitFor(() => document.querySelectorAll(".listrow a[href^='/operations/']").length >= 5);
+check("operations lists the changes, each linking to its page", (await count(".listrow a[href^='/operations/']")) >= 5);
+check("operations fits a phone", !(await overflowing()));
+await shot("75-operations-mobile");
 
 // ───────────────────────────── 8. Account ─────────────────────────────
 await open("/account", DESKTOP);

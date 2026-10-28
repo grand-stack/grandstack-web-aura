@@ -13,6 +13,7 @@ const PATHS = {
   back: <><path d="M15 5l-7 7 7 7" /></>,
   x: <><path d="M6 6l12 12M18 6L6 18" /></>,
   copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></>,
+  arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
   check: <><path d="M5 12.5l4.5 4.5L19 7.5" /></>,
   alert: <><path d="M12 5v8M12 18v.01" /></>,
   warn: <><path d="M12 4l9 16H3z" /><path d="M12 10v4M12 17.5v.01" /></>,

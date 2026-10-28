@@ -21,9 +21,21 @@ describe("the composed supergraph", () => {
     expect(sdl).toMatch(/enum join__Graph \{[^}]*STORE @join__graph\(name: "Store"/s);
   });
 
-  it("can only be changed through the aura subgraph's three mutations", () => {
+  it("can only be changed through the aura subgraph's mutations, which plan, confirm and cancel", () => {
     // The store's public subgraph is read-only, so none of its generated create, update or delete mutations can appear
-    expect(names("Mutation").sort()).toEqual(["connectAura", "disconnectAura", "syncNow"]);
+    expect(names("Mutation").sort()).toEqual(["cancelOperation", "confirmOperation", "connectAura", "disconnectAura", "planPause", "planResume", "planUpdate", "syncNow"]);
+  });
+
+  it("has no mutation that writes an operation or an instance directly, so a change has to be confirmed to reach Aura", () => {
+    expect(names("Mutation").filter((n) => /^(create|update|delete)/.test(n))).toEqual([]);
+  });
+
+  it("makes every plan return only an id to review, not a way to skip the review", () => {
+    for (const plan of ["planUpdate", "planPause", "planResume"]) {
+      const field = fieldsOf("Mutation").find((f) => f.name.value === plan)!;
+      expect(JSON.stringify(field.type)).toContain("PlannedChange");
+    }
+    expect(names("PlannedChange")).toEqual(["operationId"]);
   });
 
   it("serves the reads the gallery needs from the store, and the setup state from aura", () => {
