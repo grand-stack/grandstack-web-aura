@@ -61,14 +61,20 @@ export const CheckInstanceQuery = graphql(`
   query CheckInstance($instanceId: String!) { checkInstance(instanceId: $instanceId) { checkedAt inAura differences { field label stored live } } }
 `);
 
-// Everything a tenant can create, for the create form's steps
+// The tenants to choose from. Light: a real account's tenants each offer about three thousand combinations.
+export const CreateTenantsQuery = graphql(`
+  query CreateTenants {
+    tenants(sort: [{ name: ASC }]) { auraId name }
+  }
+`);
+
+// What one tenant can create, read once it is chosen, for the create form's steps
 export const CreateOptionsQuery = graphql(`
-  query CreateOptions {
-    tenants(sort: [{ name: ASC }]) {
-      auraId name
+  query CreateOptions($tenant: String!) {
+    tenants(where: { auraId: { eq: $tenant } }) {
+      auraId
       configurations { cloudProvider region regionName type memory storage version }
     }
-    tiers { type label }
   }
 `);
 

@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 import { describe, expect, it } from "vitest";
-import { EMPTY_CHOICE, choose, cloudsOf, createVariables, firstOpenStep, regionsOf, sizesOf, stepDone, tiersOf, type Choice, type Offer } from "./create";
+import { EMPTY_CHOICE, tierName, choose, cloudsOf, createVariables, firstOpenStep, regionsOf, sizesOf, stepDone, tiersOf, type Choice, type Offer } from "./create";
 
 const offer = (cloudProvider: string, region: string, regionName: string, type: string, memory: string, storage: string): Offer => ({ cloudProvider, region, regionName, type, memory, storage, version: "5" });
 const OFFERS: Offer[] = [
@@ -101,5 +101,13 @@ describe("createVariables", () => {
     expect(createVariables({ ...ready, size: "" }, OFFERS)).toBeUndefined();
     expect(createVariables({ ...ready, name: "" }, OFFERS)).toBeUndefined();
     expect(createVariables(EMPTY_CHOICE, OFFERS)).toBeUndefined();
+  });
+});
+
+describe("tierName", () => {
+  it("names the tiers Aura has, and shows one it does not know as it is", () => {
+    expect(tierName("professional-db")).toBe("AuraDB Professional");
+    expect(tierName("enterprise-db")).toBe("AuraDB Virtual Dedicated Cloud");
+    expect(tierName("future-db")).toBe("future-db");
   });
 });

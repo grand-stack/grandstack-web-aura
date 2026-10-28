@@ -481,7 +481,10 @@ await accessibility("create");
 await shot("76-create-tenant-mobile");
 await radio("tenant", "Acme Staging");
 await clickByText("button", "Continue");
-check("the cloud step offers only what the tenant is offered", (await waitText("h1", "Which cloud?")) && (await radioCount("cloud")) >= 1);
+await waitText("h1", "Which cloud?");
+// Only the chosen tenant's options are read, once it is chosen, so they arrive after the step shows
+await waitFor(() => document.querySelectorAll("input[name=cloud]").length >= 1);
+check("the cloud step offers only what the tenant is offered", (await radioCount("cloud")) >= 1);
 await radio("cloud", "GCP");
 await clickByText("button", "Continue");
 await waitText("h1", "Where, and which tier?");

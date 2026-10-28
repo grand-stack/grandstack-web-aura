@@ -30,7 +30,7 @@ Before you finish a change: `npm run typecheck && npm test`, and the integration
 
 ## Rules that are easy to get wrong
 
-- **Never call a real Aura account from code, tests or scripts you run.** Use mock-aura.
+- **Never call a real Aura account from code, tests or scripts you run, unless the person has given credentials for it and said to.** Then read first (token, tenants, instances) and ask before any create, change or delete, which cost money or cannot be undone. Pass credentials by environment only, never write them to a file, a commit or a log, and tear the stack down with `-v` afterwards so the sealed secret does not stay in a volume. Otherwise use mock-aura.
 - **Secrets are never GraphQL fields.** The instance password and the Aura client secret live in `InstanceCredential` and `AuraSecret` nodes that are not in `schema.graphql`. `store/test/schema.test.ts` and `integration.test.ts` fail if a password, secret, cipher or nonce field appears. Do not add one.
 - **The public store schema is read-only.** `publicTypeDefs` adds `@mutation(operations: [])` to every `@node` type. Writes go through the internal endpoint (token required, never published, never routed through the gateway).
 - **Timestamps are ISO 8601 UTC strings, not `DateTime`.** The library formats `DateTime` with the APOC plugin, which a plain Neo4j image lacks.
@@ -69,3 +69,5 @@ Before you finish a change: `npm run typecheck && npm test`, and the integration
 - **nginx caches addresses at start unless told not to.** The edge uses a resolver and variables in `proxy_pass` so a restarted gateway is found again. Keep that. `add_header` in a location replaces the server's headers, so the security headers are included again where one is added.
 - **A busybox `grep` treats `\$` and `\|` in basic expressions differently from GNU grep.** Use `grep -E` in the edge's start-up script.
 - **A new `.github/workflows` action is pinned by commit SHA** (resolve it with `gh api repos/OWNER/REPO/git/ref/tags/TAG`), with the version in a comment.
+- **Real Aura differs from its OpenAPI file.** `graph_nodes` and `graph_relationships` are numbers, not strings. mock-aura follows the file (its contract test checks it), so it cannot catch this kind of mismatch: when something touches a new field, look at a real response. The store's text fields take `String(value)`.
+- **A real tenant offers about 3,000 option combinations.** Never read every tenant's options in one query. Read the chosen tenant's, and keep reads compressed at the edge.

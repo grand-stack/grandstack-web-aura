@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery } from "urql";
-import { CreateOptionsQuery, PlanCreateMutation } from "../graphql/documents";
+import { CreateOptionsQuery, CreateTenantsQuery, PlanCreateMutation } from "../graphql/documents";
 import { errorMessage, useTitle } from "../hooks";
 import { MAX_NAME, nameError, nameLength, sizeKey } from "../lib/changes";
-import { EMPTY_CHOICE, STEPS, STEP_TITLE, choose, cloudsOf, createVariables, regionsOf, sizesOf, stepDone, tiersOf, type Choice, type Offer, type Step } from "../lib/create";
+import { EMPTY_CHOICE, STEPS, tierName, STEP_TITLE, choose, cloudsOf, createVariables, regionsOf, sizesOf, stepDone, tiersOf, type Choice, type Offer, type Step } from "../lib/create";
 import { cloudLabel, size } from "../lib/format";
 import { Banner, Button, EmptyState, Skeleton } from "../ui";
 
@@ -26,15 +26,16 @@ function Option({ name, value, checked, onChange, title, sub }: { name: string; 
 export function Create() {
   useTitle("New instance");
   const navigate = useNavigate();
-  const [{ data, fetching }] = useQuery({ query: CreateOptionsQuery });
+  const [{ data, fetching }] = useQuery({ query: CreateTenantsQuery });
   const [{ fetching: planning, error }, plan] = useMutation(PlanCreateMutation);
   const [choice, setChoice] = useState<Choice>(EMPTY_CHOICE);
   const [step, setStep] = useState<Step>("tenant");
 
   const tenants = data?.tenants ?? [];
   const tenant = tenants.find((t) => t.auraId === choice.tenant);
-  const offers: Offer[] = useMemo(() => tenant?.configurations ?? [], [tenant]);
-  const tierName = (type: string) => data?.tiers.find((t) => t.type === type)?.label ?? type;
+  // Only the chosen tenant's options are read (thousands of rows on a real account), once it is chosen
+  const [{ data: optionsData, fetching: loadingOptions }] = useQuery({ query: CreateOptionsQuery, variables: { tenant: choice.tenant }, pause: choice.tenant === "" });
+  const offers: Offer[] = useMemo(() => optionsData?.tenants[0]?.configurations ?? [], [optionsData]);
 
   // With a single tenant there is nothing to choose: start at the cloud
   useEffect(() => {
@@ -98,14 +99,15 @@ export function Create() {
       {step === "tenant" && (
         <fieldset className="panel formpanel">
           <legend>Tenant</legend>
-          {tenants.map((t) => <Option key={t.auraId} name="tenant" value={t.auraId} checked={choice.tenant === t.auraId} onChange={() => set({ tenant: t.auraId })} title={t.name} sub={`${new Set(t.configurations.map((c) => c.cloudProvider)).size} clouds offered`} />)}
+          {tenants.map((t) => <Option key={t.auraId} name="tenant" value={t.auraId} checked={choice.tenant === t.auraId} onChange={() => set({ tenant: t.auraId })} title={t.name} />)}
         </fieldset>
       )}
 
       {step === "cloud" && (
         <fieldset className="panel formpanel">
           <legend>Cloud</legend>
-          {cloudsOf(offers).length === 0 && <p className="note">This tenant is not offered anything to create. Sync to refresh what it can create.</p>}
+          {loadingOptions && <p className="note" role="status">Reading what this tenant can create…</p>}
+          {!loadingOptions && cloudsOf(offers).length === 0 && <p className="note">This tenant is not offered anything to create. Sync to refresh what it can create.</p>}
           {cloudsOf(offers).map((c) => <Option key={c} name="cloud" value={c} checked={choice.cloud === c} onChange={() => set({ cloud: c })} title={cloudLabel(c)} />)}
         </fieldset>
       )}

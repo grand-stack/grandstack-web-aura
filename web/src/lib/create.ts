@@ -40,6 +40,17 @@ export const STEP_TITLE: Record<Step, string> = {
   name: "Name it",
 };
 
+/** Names for the tiers, as the aura subgraph names them. The store only knows the tiers an instance already uses, so a tier nobody has yet needs a name here. */
+const TIER_LABELS: Record<string, string> = {
+  "free-db": "AuraDB Free",
+  "professional-db": "AuraDB Professional",
+  "business-critical": "AuraDB Business Critical",
+  "enterprise-db": "AuraDB Virtual Dedicated Cloud",
+  "professional-ds": "AuraDS Professional",
+  "enterprise-ds": "AuraDS Enterprise",
+};
+export const tierName = (type: string): string => TIER_LABELS[type] ?? type;
+
 const TIER_ORDER = ["free-db", "professional-db", "business-critical", "enterprise-db", "professional-ds", "enterprise-ds"];
 
 const unique = <T>(items: T[]): T[] => [...new Set(items)];

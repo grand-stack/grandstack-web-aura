@@ -91,8 +91,9 @@ export function instanceProperties(detail: InstanceDetail, syncedAt: string) {
     secondariesCount: detail.secondaries_count ?? null,
     cdcEnrichmentMode: detail.cdc_enrichment_mode ?? null,
     metricsIntegrationUrl: detail.metrics_integration_url ?? null,
-    graphNodes: detail.graph_nodes ?? null,
-    graphRelationships: detail.graph_relationships ?? null,
+    // The spec says these are strings, but the real API sends numbers. Either is kept as text.
+    graphNodes: detail.graph_nodes === undefined || detail.graph_nodes === null ? null : String(detail.graph_nodes),
+    graphRelationships: detail.graph_relationships === undefined || detail.graph_relationships === null ? null : String(detail.graph_relationships),
     customerManagedKeyId: detail.customer_managed_key_id ?? null,
     createdAt: detail.created_at ?? null,
     syncedAt,

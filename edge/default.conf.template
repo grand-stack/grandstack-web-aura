@@ -35,6 +35,12 @@ server {
   include /etc/nginx/snippets/security-headers.conf;
   add_header Strict-Transport-Security $gwa_hsts always;
 
+  # A real account's create form reads over a megabyte of options, which shrinks to a few percent
+  gzip on;
+  gzip_min_length 1024;
+  gzip_proxied any;
+  gzip_types application/json application/javascript text/css image/svg+xml;
+
   auth_basic           "Aura console";
   auth_basic_user_file /etc/nginx/secrets/htpasswd;
   limit_req            zone=gwa_requests burst=60 nodelay;
@@ -60,6 +66,9 @@ server {
     limit_req zone=gwa_mutations burst=30 nodelay;
     # Answers can hold a password the person asked to see, so nothing may keep them
     proxy_hide_header Cache-Control;
+    # Reads (GET) are compressed. A change's answer (POST) can hold a password, and compressing a secret next to anything a caller can
+    # influence is how the BREACH attack works, so those are left alone.
+    if ($request_method = POST) { gzip off; }
     include /etc/nginx/snippets/security-headers.conf;
     add_header Strict-Transport-Security $gwa_hsts always;
     add_header Cache-Control "no-store" always;

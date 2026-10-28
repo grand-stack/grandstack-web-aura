@@ -75,6 +75,14 @@ check("GraphQL answers are never cached", q.headers["cache-control"] === "no-sto
 
 check("the gateway serves no query editor page", !/<html/i.test((await request(EDGE, "/graphql", { auth: good, headers: { Accept: "text/html" } })).text));
 
+const BIG = encodeURIComponent("{ __schema { types { name description fields { name description } } } }");
+const bigGet = await request(EDGE, `/graphql?query=${BIG}`, { auth: good, headers: { "Accept-Encoding": "gzip" } });
+check("a large read is compressed", bigGet.headers["content-encoding"] === "gzip", String(bigGet.headers["content-encoding"]));
+const bigPost = await request(EDGE, "/graphql", { method: "POST", auth: good, headers: { "Content-Type": "application/json", "Accept-Encoding": "gzip" }, body: JSON.stringify({ query: decodeURIComponent(BIG) }) });
+check("the answer to a POST is never compressed", bigPost.status === 200 && bigPost.headers["content-encoding"] === undefined && bigPost.text.length > 1024, `${bigPost.status} ${bigPost.headers["content-encoding"]}`);
+const js = /src="(\/assets\/[^"]+\.js)"/.exec(page.text)?.[1];
+check("the app's script is compressed", js !== undefined && (await request(EDGE, js, { auth: good, headers: { "Accept-Encoding": "gzip" } })).headers["content-encoding"] === "gzip", String(js));
+
 // What reaches the app
 check("a body over 64 kB is refused at /graphql", (await request(EDGE, "/graphql", { method: "POST", auth: good, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: "{ __typename }", pad: "x".repeat(70_000) }) })).status === 413);
 check("the app's files cannot be written to", (await request(EDGE, "/index.html", { method: "PUT", auth: good, body: "x" })).status === 403);
