@@ -4,7 +4,7 @@ A mobile-friendly web UI for managing Neo4j Aura. A local Neo4j database is a **
 
 Reads come from the store. The Aura API is called only to sync, to apply a confirmed change, and on an explicit refresh.
 
-Status: **Phase 1 (foundations) is built and tested** (section 11). Everything after it is still plan only. See [README.md](README.md) for how to run it.
+Status: **Phases 1 (foundations) and 2 (setup and sync, backend) are built and tested** (section 11). Everything after them is still plan only. See [README.md](README.md) for how to run it.
 
 ## 1. Spec check
 
@@ -128,6 +128,7 @@ Choices:
 - **Form options come from a query over these nodes**, and the choices cascade: tenant, then the clouds that tenant offers, then the regions for that cloud and tier, then the **memory and storage pair** for that combination (the spec returns them as pairs, and free instances have no storage). Edit forms use the same query to offer only the sizes valid for that instance's own cloud, region and tier. No hard-coded lists.
 - **Tier labels.** The six spec types become display labels: `free-db` AuraDB Free, `professional-db` AuraDB Professional, `business-critical` AuraDB Business Critical, `enterprise-db` AuraDB Virtual Dedicated Cloud, `professional-ds` AuraDS Professional, `enterprise-ds` AuraDS Enterprise. The gallery's tier tag shows the label.
 - **Timestamps are ISO 8601 UTC strings** (for example `2026-10-28T09:03:00Z`), set by the aura subgraph, not the `DateTime` scalar. The library formats `DateTime` with the APOC plugin, which a plain Neo4j image does not have, and ISO strings sort correctly as text. The aura subgraph also sets `Operation.createdAt` and `updatedAt`.
+- **`Instance.version` is often empty.** Aura's instance details do not include the Neo4j version (only the create request and the option list carry one), so an instance found by a sync has none. Only instances created here record it.
 - **Connection details live with the instance.** `connectionUrl` is on the instance. The username and password sit in a separate `InstanceCredential` node so the secret can be kept out of every normal query (section 6). An instance created outside this app has no stored password.
 - **Facets as nodes.** `CloudProvider` and `Tier` are nodes, like `Genre` in the movie app, so the gallery can show a count per tag with a `totalCount` over the connection. Tenant is already a node. Counts follow the movie app's rule: each facet's count is computed as if its own filter were off, so ticking one tag still shows how many results each other tag would give.
 - Observed state (`Instance`) and intent (`Operation.desired`) are separate. Instances deleted in Aura get `deletedInAuraAt` instead of being removed, so history survives.
@@ -223,11 +224,23 @@ grandstack-web-aura/
    - `store`: the graph model, constraints, the public read-only and internal read-write schemas, and the token-protected internal endpoint. 16 unit tests plus 12 integration tests against a real Neo4j (constraints are idempotent, federation SDL, tag counts, `_entities`, secrets never selectable, public schema cannot write).
    - Dockerfiles with pinned image digests that run as a non-root user, and `compose.yaml` (Neo4j, store, mock-aura). Brought up and checked end to end.
    - Found and fixed while building: a `@cypher` field with no row dropped whole instances from results, and `DateTime` needs the APOC plugin (now ISO strings).
-2. **Setup and sync**: credentials flow, token manager, read-only sync of tenants and instances, instance list in the UI.
-3. **Plan and confirm**: Operation model and state machine, update and pause/resume first (reversible), review screen.
-4. **Create and delete**: create stepper, storing the connection details and the password reveal, delete with type-to-confirm, drift display.
-5. **Hardening**: UI auth, encryption at rest, rate-limit handling, mobile pass on real devices, docs.
-6. **Later (model already allows)**: snapshots, CMEK, GDS sessions, metrics, SSE progress, roles.
+2. **Setup and sync (backend). Done.**
+   - `aura` subgraph, with these parts and their tests:
+     - **Encryption** (`SecretBox`): AES-256-GCM, a fresh nonce per secret, the owner bound in as authenticated data so a sealed value cannot be moved to another record, and key versions for rotation.
+     - **Secret storage** (`SecretStore`): the Aura client id and secret are sealed together and stored as an `AuraSecret` node over Bolt. Neither appears anywhere in the database, a log or an error.
+     - **REST client** (`AuraClient`): types from the spec; a cached token that is refreshed 60 s before it expires, with one refresh at a time; one fresh token on a 401 or 403; `Retry-After` (seconds or a date) honoured, and after a 429 every request waits, not only the refused one; backoff on 5xx; a too-long `Retry-After` is an error, not a wait; a network failure becomes "Could not reach Aura" without the address.
+     - **Sync**: reads tenants and each tenant's options, the instance list, then each instance's details, and writes the store through its internal endpoint. Runs are recorded as `SyncRun` (SUCCEEDED, SLOWED when Aura asked it to wait, or FAILED with a plain-words error). Idempotent, and never doubles a link. Moves a cloud or tier tag when Aura reports a different one. An instance gone from Aura is kept and marked `deletedInAuraAt` once. An instance that vanishes between the list and its details is skipped. A failed run keeps what the store already had.
+     - **Service**: `connectAura` checks the credentials with Aura first and stores nothing if they are refused, then stores the secret sealed, records the account and starts a first sync. `syncNow` runs one sync at a time. `disconnectAura` deletes the secret and keeps instances, passwords and history. A sync runs at start-up if an account is connected, and on a timer.
+     - **GraphQL**: `auraSetup`, `connectAura`, `syncNow`, `disconnectAura`. A `UserError`'s message reaches the person. Any other error is masked.
+   - `gateway`: the store's public subgraph and the aura subgraph compose into one supergraph (committed, with tests that it exposes only the three aura mutations and no secret field). The federation question from Phase 1 is answered: it composes cleanly.
+   - `compose.yaml` runs Neo4j, store, aura, mock-aura and gateway, pointed at mock-aura by default, with every port bound to 127.0.0.1. The gateway is on **4100**, because grandstack's own stack uses 4000.
+   - Checked end to end through the gateway on real containers: wrong secret refused with a plain message, one query spanning both subgraphs, no store mutation reachable, no secret in the database or any real service's log, the internal store port unreachable from the host, disconnect keeps the data, and a restart syncs by itself.
+   - Found and fixed while building: relationship `connect` is not idempotent (connecting a linked tag adds a second link, so the sync only connects on create or on a real change); the store's filters have no `neq`; two sync runs in the same second shared a `startedAt`, so the latest run could be the wrong one (timestamps now carry milliseconds); Aura's instance details do **not** include the Neo4j version, so an instance found by a sync has no `version` (only instances created here will).
+3. **Web app, read-only**: React and Vite on the movie app's patterns. The setup form, then the home page, results with filters, instance detail with the connection card, the Operations list and the Aura account page, all reading through the gateway. This is the "instance list in the UI" that was part of the old Phase 2.
+4. **Plan and confirm**: Operation model and state machine, update and pause/resume first (reversible), review screen.
+5. **Create and delete**: create stepper, storing the connection details and the password reveal, delete with type-to-confirm, drift display.
+6. **Hardening**: UI auth (Basic auth at the gateway and web), TLS guidance, rate-limit tuning against a real account, mobile pass on real devices, docs, CI.
+7. **Later (model already allows)**: snapshots, CMEK, GDS sessions, metrics, SSE progress, roles.
 
 ## 12. Decisions (made)
 

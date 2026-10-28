@@ -7,6 +7,7 @@ COPY package.json package-lock.json tsconfig.base.json ./
 COPY store/package.json store/
 COPY aura/package.json aura/
 COPY mock-aura/package.json mock-aura/
+COPY gateway/package.json gateway/
 RUN npm ci --workspace store --include-workspace-root
 COPY store ./store
 RUN npm run build -w store && npm prune --omit=dev --workspace store --include-workspace-root

@@ -11,12 +11,14 @@
   "workspaces": [
     "store",
     "aura",
-    "mock-aura"
+    "mock-aura",
+    "gateway"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "generate:api": "npm run generate:api -w aura"
+    "generate:api": "npm run generate:api -w aura",
+    "compose:supergraph": "npm run compose -w gateway"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

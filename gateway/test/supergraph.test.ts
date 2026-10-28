@@ -1,0 +1,63 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+import { readFileSync } from "node:fs";
+import { Kind, parse, type FieldDefinitionNode, type ObjectTypeDefinitionNode } from "graphql";
+import { describe, expect, it } from "vitest";
+
+// The supergraph is composed from the running subgraphs (`npm run compose:supergraph`) and committed. These tests read the committed
+// file, so they run without a stack. They guard what must stay true however it is recomposed.
+const sdl = readFileSync(new URL("../supergraph.graphql", import.meta.url), "utf8");
+const document = parse(sdl);
+
+const objectTypes = new Map(
+  document.definitions.filter((d): d is ObjectTypeDefinitionNode => d.kind === Kind.OBJECT_TYPE_DEFINITION).map((d) => [d.name.value, d] as const),
+);
+const fieldsOf = (type: string): FieldDefinitionNode[] => [...(objectTypes.get(type)?.fields ?? [])];
+const names = (type: string) => fieldsOf(type).map((f) => f.name.value);
+
+describe("the composed supergraph", () => {
+  it("joins the store and aura subgraphs", () => {
+    expect(sdl).toMatch(/enum join__Graph \{[^}]*AURA @join__graph\(name: "Aura"/s);
+    expect(sdl).toMatch(/enum join__Graph \{[^}]*STORE @join__graph\(name: "Store"/s);
+  });
+
+  it("can only be changed through the aura subgraph's three mutations", () => {
+    // The store's public subgraph is read-only, so none of its generated create, update or delete mutations can appear
+    expect(names("Mutation").sort()).toEqual(["connectAura", "disconnectAura", "syncNow"]);
+  });
+
+  it("serves the reads the gallery needs from the store, and the setup state from aura", () => {
+    expect(names("Query")).toEqual(
+      expect.arrayContaining(["auraSetup", "instances", "instancesConnection", "tenants", "instanceConfigurations", "cloudProviders", "tiers", "operations", "syncRuns", "auraAccounts"]),
+    );
+  });
+
+  it("keeps Instance a federation entity owned by the store", () => {
+    expect(sdl).toMatch(/type Instance @join__type\(graph: STORE, key: "auraId"\)/);
+  });
+
+  it("has no credential type and no field that could return a password, secret or cipher", () => {
+    expect(sdl).not.toMatch(/InstanceCredential|AuraSecret/);
+    const suspicious = [...objectTypes.values()]
+      .filter((t) => !t.name.value.startsWith("join__") && !t.name.value.startsWith("link__"))
+      .flatMap((t) => (t.fields ?? []).map((f) => `${t.name.value}.${f.name.value}`))
+      // hasStoredPassword, its filters and passwordRevealCount are the intended metadata
+      .filter((f) => /password|secret|cipher|nonce/i.test(f) && !/\.(hasStoredPassword|passwordRevealCount)/.test(f));
+    expect(suspicious).toEqual([]);
+  });
+
+  it("takes the client secret only as the argument of connectAura", () => {
+    const connect = fieldsOf("Mutation").find((f) => f.name.value === "connectAura")!;
+    expect((connect.arguments ?? []).map((a) => a.name.value).sort()).toEqual(["clientId", "clientSecret"]);
+    // as a name it appears nowhere else in the schema's own definitions (descriptions may mention it)
+    const outsideDescriptions = sdl.replace(/"""[\s\S]*?"""/g, "").replace(/#.*$/gm, "");
+    expect(outsideDescriptions.match(/clientSecret/g)).toHaveLength(1);
+  });
+
+  it("points at the subgraphs by localhost address, which gateway.config.ts replaces in compose", () => {
+    expect(sdl).toContain('url: "http://localhost:4001/graphql"');
+    expect(sdl).toContain('url: "http://localhost:4010/graphql"');
+    // never the store's internal port
+    expect(sdl).not.toMatch(/4002/);
+  });
+});

@@ -21,6 +21,8 @@ export interface MockAura {
   server: Server;
   /** The live state, for tests that need to look or arrange. */
   state: { tenants: Tenant[]; instances: Map<string, Instance>; passwords: Map<string, string> };
+  /** Put the seed data back and forget all tokens and pending changes. For tests that share one mock. */
+  reset(): void;
   listen(port?: number): Promise<number>;
   close(): Promise<void>;
 }
@@ -335,6 +337,14 @@ export function createMockAura(options: MockAuraOptions = {}): MockAura {
   return {
     server,
     state,
+    reset() {
+      for (const t of timers) clearTimeout(t);
+      timers.clear();
+      state.tenants = seedTenants();
+      state.instances = new Map(seedInstances().map((i) => [i.id, i]));
+      state.passwords = new Map();
+      requestLog.clear();
+    },
     listen: (port = 0) =>
       new Promise((resolve) => {
         server.listen(port, () => resolve((server.address() as { port: number }).port));
