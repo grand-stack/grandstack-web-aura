@@ -1,12 +1,13 @@
 # AGENTS.md: grandstack-web-aura
 
-A web UI for managing Neo4j Aura. Neo4j is a cache of Aura's state; the Aura REST API is used to sync and to apply confirmed changes. Read [PLAN.md](PLAN.md) first: the design, graph model, security rules and phases are there, and it is kept true.
+A web UI for managing Neo4j Aura. Neo4j is a cache of Aura's state; the Aura REST API is used to sync and to apply confirmed changes. Read [docs/architecture.md](docs/architecture.md) first, then [docs/recipes.md](docs/recipes.md) for the change you are making. [PLAN.md](PLAN.md) holds the design decisions and the build history, and is kept true.
 
 ## Commands
 
 ```sh
 npm ci
 npm run typecheck                         # all workspaces
+npm run docs:check                        # relative links, anchors, and every diagram's alt text and legend
 npm test                                  # all workspaces, no database needed
 npm run generate:api                      # aura/src/generated/aura-api.d.ts from docs/aura_api_spec_v1-2.yaml
 npm run compose:supergraph                # recompose gateway/supergraph.graphql from the RUNNING subgraphs (stack up first)
@@ -17,10 +18,12 @@ npm run codegen -w web                    # typed queries for the web app, read 
 npm run e2e -w web                        # real-browser checks; needs Chrome and a FRESH stack, see web/e2e/README.md
 ```
 
-Before you finish a change: `npm run typecheck && npm test`, and the integration tests (with a Neo4j) if you touched `store/` or `aura/`. If you changed a subgraph's schema, recompose and commit the supergraph.
+Before you finish a change: `npm run typecheck && npm test && npm run docs:check`, and the integration tests (with a Neo4j) if you touched `store/` or `aura/`. If you changed a subgraph's schema, recompose and commit the supergraph.
 
 ## Layout
 
+- `edge/` the optional nginx in front (TLS, sign-in, rate limits, headers); `check.mjs` checks what it promises. `scripts/init-env.sh` makes `.env`, and with `--edge` the certificate and sign-in. `compose.yaml` (plain HTTP on loopback), `compose.edge.yaml`, `compose.dev.yaml`.
+- `aura/src/operations/` plan, confirm, run and recover a change (`state.ts` the state machine, `diff.ts` the review, `plan.ts` the checks, `run.ts` the reconciler, `service.ts` the entry points, `store.ts` the store calls).
 - `store/` the store subgraph. `schema/schema.graphql` is the graph model. `setup/constraints.cypher` runs at every start. `src/schemas.ts` builds the public (read-only) and internal (read-write) schemas from the one file.
 - `mock-aura/` a fake Aura API. `test/contract.test.ts` validates its responses against the real spec.
 - `aura/` the aura subgraph. `src/client.ts` the REST client and token manager, `src/sync.ts` Aura into the store, `src/service.ts` connect, disconnect, sync-now and the timer, `src/crypto.ts` and `src/secrets.ts` the sealed secrets, `src/schema.ts` its GraphQL. `src/generated/` is generated, never edit it. `test/integration/` uses a real Neo4j, the real store schemas and mock-aura in one process.
@@ -71,3 +74,7 @@ Before you finish a change: `npm run typecheck && npm test`, and the integration
 - **A new `.github/workflows` action is pinned by commit SHA** (resolve it with `gh api repos/OWNER/REPO/git/ref/tags/TAG`), with the version in a comment.
 - **Real Aura differs from its OpenAPI file.** `graph_nodes` and `graph_relationships` are numbers, not strings. mock-aura follows the file (its contract test checks it), so it cannot catch this kind of mismatch: when something touches a new field, look at a real response. The store's text fields take `String(value)`.
 - **A real tenant offers about 3,000 option combinations.** Never read every tenant's options in one query. Read the chosen tenant's, and keep reads compressed at the edge.
+
+## Keep the docs true
+
+When you change behaviour, update the matching doc in the same change: routes, folder map and security model in `docs/architecture.md`; how a feature works in `docs/features.md`; settings and names in `docs/customising.md`; a new way of changing things in `docs/recipes.md`; test layers and gotchas in `docs/testing.md`; deployment in `docs/deploying.md`. PLAN.md records decisions and history. Diagrams are SVG files in `docs/diagrams/` with a numbered legend under each figure: edit the SVG and its legend together. `npm run docs:check` fails on a broken relative link or anchor, a missing alt text, unsafe SVG content (script, style, foreignObject, external links), and legend numbers that do not match the callouts drawn (the blue numbered circles, fill `#0a6190`).

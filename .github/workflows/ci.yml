@@ -43,6 +43,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - name: Documentation links and diagrams
+        run: npm run docs:check
       - name: Known vulnerabilities in what ships
         run: npm audit --omit=dev --audit-level=high
       - name: Tests, with the integration tests against Neo4j

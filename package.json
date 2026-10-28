@@ -19,7 +19,8 @@
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "generate:api": "npm run generate:api -w aura",
-    "compose:supergraph": "npm run compose -w gateway"
+    "compose:supergraph": "npm run compose -w gateway",
+    "docs:check": "node scripts/check-links.mjs"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

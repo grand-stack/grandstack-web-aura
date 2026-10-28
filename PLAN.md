@@ -4,7 +4,7 @@ A mobile-friendly web UI for managing Neo4j Aura. A local Neo4j database is a **
 
 Reads come from the store. The Aura API is called only to sync, to apply a confirmed change, and on an explicit refresh.
 
-Status: **Phases 1 (foundations), 2 (setup and sync, backend), 3 (read-only web app) 4 (plan and confirm), 5 (create and delete) and 6 (hardening, with two parts not yet done) are built and tested** (section 11). Everything after them is still plan only. See [README.md](README.md) for how to run it.
+Status: **Phases 1 (foundations), 2 (setup and sync, backend), 3 (read-only web app) 4 (plan and confirm), 5 (create and delete) and 6 (hardening, with two parts not yet done) are built and tested** (section 11). Everything after them is still plan only. See [README.md](README.md) for how to run it, and [docs/architecture.md](docs/architecture.md) for what exists today.
 
 ## 1. Spec check
 

@@ -18,6 +18,21 @@ Phases 1 to 6 are built and tested. You can create, edit, pause, resume and dele
 | [edge/](edge) | Optional (`compose.edge.yaml`): nginx in front of everything with TLS, Basic sign-in, rate limits, security headers | Built, checked by `edge/check.mjs` and CI |
 | [web/](web) | The React app: connect, gallery with filters, instance details, create, edit, review and progress screens, password reveal, operations list, account page | Built. Checked in a real browser on a phone and a desktop screen |
 
+## Documentation
+
+| Read | To learn |
+| --- | --- |
+| [Architecture](docs/architecture.md) | The parts and how they fit, the graph model, routes, data flow, the security model, how it is deployed |
+| [Features](docs/features.md) | How each feature works and where the code is: sync, plan and confirm, create, delete, the password, drift |
+| [Customising](docs/customising.md) | What is generic, the look, names, every setting, using the fake or a real Aura, adapting the pattern |
+| [Recipes](docs/recipes.md) | Step-by-step common changes, from showing a new field to adding a kind of change |
+| [Testing](docs/testing.md) | Type checks, codegen, unit and contract tests, integration tests with Neo4j, the edge checks, the browser run |
+| [Deploying](docs/deploying.md) | The two ways to run it, what the sign-in does and does not protect, a real hostname, backups |
+| [Real account checklist](docs/real-account-checklist.md) | What has and has not been checked against real Aura, and a safe first run |
+| [PLAN.md](PLAN.md) | The design decisions and how the project was built, phase by phase |
+
+Working with a coding agent? Start with [AGENTS.md](AGENTS.md).
+
 ## Run it
 
 The stack points at mock-aura by default, so no real Aura account is touched. Docker works as well as podman.
