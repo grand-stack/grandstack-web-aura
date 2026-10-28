@@ -11,6 +11,7 @@
 #   scripts/init-env.sh                    first time, for the app on plain HTTP on this machine
 #   scripts/init-env.sh --edge             first time, and for the edge too (prints the sign-in password once)
 #   scripts/init-env.sh --new-password     choose a new sign-in password (prints it once)
+#   EDGE_PASSWORD=... scripts/init-env.sh --new-password   set the password yourself instead of a random one
 #   EDGE_SAN="IP:192.168.0.5,DNS:mylaptop.local" scripts/init-env.sh --new-cert
 #                                          reissue the certificate for those names too, so a phone on the same network reaches it by them
 set -euo pipefail
@@ -57,7 +58,8 @@ if [ ! -s edge/secrets/tls.crt ] || [ ! -s edge/secrets/tls.key ] || [ "$new_cer
 fi
 
 if [ ! -s edge/secrets/htpasswd ] || [ "$new_password" = true ]; then
-  password="$(random 32)"
+  # A password of your own choosing is possible, and as weak as you make it
+  password="${EDGE_PASSWORD:-$(random 32)}"
   htpasswd -nbB "$user" "$password" | sed '/^$/d' > edge/secrets/htpasswd
   chmod 644 edge/secrets/htpasswd
   echo
