@@ -6,7 +6,7 @@ import { mkdirSync } from "node:fs";
 
 // By default the app is the web server on plain HTTP. With the edge in front (BASE_URL=https://localhost:8443) set E2E_PASSWORD to the sign-in
 // password scripts/init-env.sh --edge printed.
-const BASE = process.env.BASE_URL ?? "http://localhost:3100";
+const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const GATEWAY = process.env.GRAPHQL_URL ?? `${BASE}/graphql`;
 const USER = process.env.E2E_USER ?? "admin";
 const PASSWORD = process.env.E2E_PASSWORD;

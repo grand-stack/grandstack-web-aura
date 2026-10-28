@@ -1,6 +1,6 @@
 # AGENTS.md: grandstack-web-aura
 
-A web UI for managing Neo4j Aura. Neo4j is a cache of Aura's state; the Aura REST API is used to sync and to apply confirmed changes. Read [docs/architecture.md](docs/architecture.md) first, then [docs/recipes.md](docs/recipes.md) for the change you are making. [PLAN.md](PLAN.md) holds the design decisions and the build history, and is kept true.
+A web UI for managing Neo4j Aura, built as a GRANDstack setup. Neo4j is a cache of Aura's state, served by `grandstack-server` (`MODEL=aura`); the Aura REST API is used to sync and to apply confirmed changes. The compose files are in the `grandstack` repository (`compose.aura.yaml`), and the gateway image is `grandstack-federation`'s. The repositories must sit side by side. Read [docs/architecture.md](docs/architecture.md) first, then [docs/recipes.md](docs/recipes.md) for the change you are making. [PLAN.md](PLAN.md) holds the design decisions and the build history, and is kept true.
 
 ## Commands
 
@@ -8,53 +8,53 @@ A web UI for managing Neo4j Aura. Neo4j is a cache of Aura's state; the Aura RES
 npm ci
 npm run typecheck                         # all workspaces
 npm run docs:check                        # relative links, anchors, and every diagram's alt text and legend
-npm test                                  # all workspaces, no database needed
+npm test                                  # all workspaces; the integration tests need NEO4J_TEST_URI and ../grandstack-server built
 npm run generate:api                      # aura/src/generated/aura-api.d.ts from docs/aura_api_spec_v1-2.yaml
 npm run compose:supergraph                # recompose gateway/supergraph.graphql from the RUNNING subgraphs (stack up first)
-podman compose -p gwa up -d --build       # the stack, see README.md "Run it" (needs SECRET_KEY in .env). docker compose works too
-npm run test:integration -w store         # integration tests need NEO4J_TEST_URI, see README.md
-npm run test:integration -w aura          # (or just `npm test` with NEO4J_TEST_URI set)
 npm run codegen -w web                    # typed queries for the web app, read from the RUNNING gateway; commit the output
-npm run e2e -w web                        # real-browser checks; needs Chrome and a FRESH stack, see web/e2e/README.md
+BASE_URL=http://localhost:3000 npm run e2e -w web   # real-browser checks; needs Chrome and a FRESH stack, see web/e2e/README.md
+# the stack, from the grandstack folder (see README.md "Run it"; needs SECRET_KEY in grandstack/.env):
+#   docker compose -f compose.yaml -f compose.aura.yaml up --build           # add -f compose.aura-edge.yaml for TLS and a sign-in
 ```
 
-Before you finish a change: `npm run typecheck && npm test && npm run docs:check`, and the integration tests (with a Neo4j) if you touched `store/` or `aura/`. If you changed a subgraph's schema, recompose and commit the supergraph.
+Before you finish a change: `npm run typecheck && npm test && npm run docs:check`, and the integration tests (with a Neo4j and the sibling server built) if you touched `aura/` or `models/`. If you changed a subgraph's schema or `models/aura/schema.graphql`, recompose and commit the supergraph.
 
 ## Layout
 
-- `edge/` the optional nginx in front (TLS, sign-in, rate limits, headers); `check.mjs` checks what it promises. `scripts/init-env.sh` makes `.env`, and with `--edge` the certificate and sign-in. `compose.yaml` (plain HTTP on loopback), `compose.edge.yaml`, `compose.dev.yaml`.
+- `models/aura/` the graph model that `grandstack-server` loads with `MODEL=aura`: `schema.graphql` (every type and field described), `setup.cypher` (idempotent, run at every start), `model.json`. There is no server code in this repository.
+- `aura/` the Aura subgraph. `src/client.ts` the REST client and token manager, `src/sync.ts` Aura into the store, `src/service.ts` connect, disconnect, sync-now, reveal and check, `src/crypto.ts` and `src/secrets.ts` the sealed secrets, `src/schema.ts` its GraphQL, `src/storeClient.ts` the writable server. `src/generated/` is generated, never edit it. `test/integration/` starts two real `grandstack-server` processes (read-only and writable) from the sibling repository, with a real Neo4j and mock-aura.
 - `aura/src/operations/` plan, confirm, run and recover a change (`state.ts` the state machine, `diff.ts` the review, `plan.ts` the checks, `run.ts` the reconciler, `service.ts` the entry points, `store.ts` the store calls).
-- `store/` the store subgraph. `schema/schema.graphql` is the graph model. `setup/constraints.cypher` runs at every start. `src/schemas.ts` builds the public (read-only) and internal (read-write) schemas from the one file.
 - `mock-aura/` a fake Aura API. `test/contract.test.ts` validates its responses against the real spec.
-- `aura/` the aura subgraph. `src/client.ts` the REST client and token manager, `src/sync.ts` Aura into the store, `src/service.ts` connect, disconnect, sync-now and the timer, `src/crypto.ts` and `src/secrets.ts` the sealed secrets, `src/schema.ts` its GraphQL. `src/generated/` is generated, never edit it. `test/integration/` uses a real Neo4j, the real store schemas and mock-aura in one process.
-- `gateway/` Hive Gateway. `supergraph.graphql` is GENERATED by `npm run compose:supergraph` and committed; `test/supergraph.test.ts` guards what it may expose.
-- `web/` the React app (Vite, react-router, urql). `src/graphql/documents.ts` holds every query; `src/graphql/generated/` is generated from the gateway and committed. `src/lib/` is pure logic with unit tests (filters, status, format, theme); `src/pages/` and `src/ui/` are the screens; `e2e/run.mjs` drives Chrome.
+- `gateway/` `supergraph.graphql` is GENERATED by `npm run compose:supergraph` and committed; `gateway.config.ts` and `mesh.config.ts` are the config. They are mounted into `grandstack-federation`'s gateway image by `compose.aura.yaml`; there is no Dockerfile here. `test/supergraph.test.ts` guards what it may expose.
+- `web/` the React app (Vite, react-router, urql). `src/graphql/documents.ts` holds every query; `src/graphql/generated/` is generated from the gateway and committed. `src/lib/` is pure logic with unit tests; `src/pages/` and `src/ui/` are the screens; `default.conf.template` is its nginx config (it also forwards `/graphql`); `e2e/run.mjs` drives Chrome.
+- `edge/` the optional nginx in front (TLS, sign-in, rate limits, headers); `check.mjs` checks what it promises. `scripts/init-env.sh` writes `SECRET_KEY` into `../grandstack/.env`, and with `--edge` makes the certificate and sign-in.
 - `docs/aura_api_spec_v1-2.yaml` the real spec. It is the source of truth for the REST API.
 
 ## Rules that are easy to get wrong
 
 - **Never call a real Aura account from code, tests or scripts you run, unless the person has given credentials for it and said to.** Then read first (token, tenants, instances) and ask before any create, change or delete, which cost money or cannot be undone. Pass credentials by environment only, never write them to a file, a commit or a log, and tear the stack down with `-v` afterwards so the sealed secret does not stay in a volume. Otherwise use mock-aura.
-- **Secrets are never GraphQL fields.** The instance password and the Aura client secret live in `InstanceCredential` and `AuraSecret` nodes that are not in `schema.graphql`. `store/test/schema.test.ts` and `integration.test.ts` fail if a password, secret, cipher or nonce field appears. Do not add one.
-- **The public store schema is read-only.** `publicTypeDefs` adds `@mutation(operations: [])` to every `@node` type. Writes go through the internal endpoint (token required, never published, never routed through the gateway).
+- **Secrets are never GraphQL fields.** The instance password and the Aura client secret live in `InstanceCredential` and `AuraSecret` nodes that are not in `schema.graphql`. `aura/test/model.test.ts` and `aura/test/integration/model.test.ts` fail if a password, secret, cipher or nonce field appears. Do not add one.
+- **The read-only server is `READ_ONLY=true`; the writable one is for the Aura subgraph only.** The server adds `@mutation(operations: [])` to every `@node` type itself. The writable server has no token (the stock server has none): what keeps others out is that it is on the private `store` network in `compose.aura.yaml`, publishes no port, and is not in the gateway's config. Keep it that way, and never put it on a network the gateway or web server share.
+- **`MODEL` holds one name, so one model runs per server.** The Movies model is the default and the Aura model is mounted from `models/`. Two models need two servers and two databases. The Aura overlay uses its own Neo4j volume for that reason.
 - **Timestamps are ISO 8601 UTC strings, not `DateTime`.** The library formats `DateTime` with the APOC plugin, which a plain Neo4j image lacks.
 - **A `@cypher` field must always return a row.** Use `OPTIONAL MATCH`. A field that returns no row removes the whole parent from the results (this hid instances once).
 - **A secret is sealed before it is stored, and only ever read for the call that needs it.** `SecretBox` binds each secret to its owner, so a copied value will not open. Credentials are checked with Aura before anything is stored. Do not log, return or put a secret in an error, an `Operation` or a `desired` value. Tests scan the whole database and every real service's log for the secret.
 - **The sync only connects a relationship on create or on a real change.** Connecting one that already exists adds a second link in this library. Disconnect the old tag, then connect the new one, as two statements.
 - **The store's filters have no `neq`** (v7). Use `eq` on the value you mean, or `NOT`.
 - **Timestamps carry milliseconds** (`2026-10-28T09:03:00.123Z`). Without them two runs in one second tie and "latest" can be the wrong run. Aura's own `created_at` is stored as Aura sends it.
-- **Never use port 3000, 4000, 7474 or 7687 for this stack.** They belong to the grandstack stack that is often running. The gateway is on 4100 and the app on 3100. Look at `podman ps` before binding a port, and check a response really came from this stack before trusting a test.
+- **This setup uses the standard GRANDstack ports (3000, 4000, 7474, 7687), as the other setups do, so it replaces them.** When you test beside a running Movies stack, use a project name of your own (`-p gsaura`) and an override that moves the ports, and **never run `compose down -v` under the default project name**: it deletes the Movies data volume. Check a response really came from the stack you mean before trusting a test.
 - **Look at the app, do not only test it.** Checks passing did not show the status chips stretched across every card or the phone top bar wrapping onto two lines; screenshots (`OUT=dir npm run e2e -w web`) did. Check the phone width (390 px) and dark mode for any visual change.
 - **The web app never holds a secret longer than a request.** The client secret field is cleared after every attempt, success or not, and nothing is written to storage except the theme choice. The e2e run checks the page, storage and URL for the secret.
 - **Tag counts must use the "not removed" filter**, or they count instances Aura no longer lists. Each facet's count leaves out its own filter (`buildWhere(filters, facet)`).
 - Integration test files share one database and wipe it, so they run one at a time (`fileParallelism: false`). Do not add a second file that expects data from another.
 - Every type and field in `schema.graphql` needs a `"""description"""`. A test checks it.
-- Types need `@node` (v7). v7 has no `@unique`: uniqueness comes from `setup/constraints.cypher`.
-- `graphql` 16 ships CommonJS and ESM builds. Plain Node uses one; Vitest would use both and graphql then rejects schemas, or masks a `GraphQLError`, as coming from "another module". `aura/vitest.config.ts` aliases `graphql` to the CommonJS file, and `store/test/schema.test.ts` loads it with `createRequire`. If you see "Cannot use GraphQLSchema ... from another module" or an error that is wrongly masked, this is why.
+- Types need `@node` (v7). v7 has no `@unique`: uniqueness comes from `models/aura/setup.cypher`.
+- `graphql` 16 ships CommonJS and ESM builds. Plain Node uses one; Vitest would use both and graphql then rejects schemas, or masks a `GraphQLError`, as coming from "another module". `aura/vitest.config.ts` aliases `graphql` to the CommonJS file, and `aura/test/model.test.ts` loads it with `createRequire`. If you see "Cannot use GraphQLSchema ... from another module" or an error that is wrongly masked, this is why.
 - Keep `@apollo/subgraph` at 2.14.4 (root `overrides`); newer breaks `@neo4j/graphql` 7.6.4. Pin exact dependency versions.
 - The mock must not drift from the spec. If you add an endpoint to mock-aura, add it to `contract.test.ts`, and check its responses validate.
 - New code files need the copyright header (two lines: `Copyright (c) "Neo4j"` and `Neo4j Sweden AB [http://neo4j.com]`, in the file's comment syntax). Generated files are exempt.
 - Base images in Dockerfiles and compose files are pinned to an exact version and a digest (`image:1.2.3@sha256:...`), never a floating tag. To pin a new image, look up the digest of the multi-arch index.
-- **Commit at the end of each phase** (the phases are in PLAN.md section 11), once typecheck and tests pass and PLAN.md and README.md say what was built. One commit per phase, with a message that lists what was added and any design changes. Do not push or bump versions unless asked.
+- **Commit at the end of each phase** (the phases are in PLAN.md section 11), once typecheck and tests pass and PLAN.md and README.md say what was built. One commit per phase, with a message that lists what was added and any design changes. Do not push or bump versions unless asked. Releases use the **release-cut** workflow, not hand-made tags (see `grandstack/docs/releasing.md`).
 - **Nothing reaches Aura without a confirm.** A plan only writes an `Operation` (PLANNED) and returns its id. `confirmOperation` moves PLANNED to CONFIRMED with an atomic compare-and-set; every state change goes through `moveOperation`, which throws on a move the state machine does not allow. Do not add a mutation that sends to Aura any other way. The supergraph test lists the exact mutations.
 - **A change to Aura is never retried after a 5xx or a lost connection.** It may have been applied. Reads are retried. Completion needs a stable status **and** the values that were asked for, not either alone.
 - **The stale check compares fields, not `syncedAt`.** A sync that changed nothing must not invalidate a plan; a changed name, size or switch must.
@@ -66,7 +66,7 @@ Before you finish a change: `npm run typecheck && npm test && npm run docs:check
 - **A create is never sent twice.** It is not retried after a 5xx or lost answer, and recovery fails a possibly-sent create instead of asking again.
 - **The phone top bar has room for four icons, not five.** A fifth made the page scroll sideways and made taps miss their targets on a touch viewport only. Put new actions in the page and run the e2e on the phone viewport.
 - **mock-aura test controls**: `GET /__passwords/:id` shows the password of a created instance, so a test can compare it with what the app shows.
-- **Only the web server is published by default, and only on loopback.** `compose.yaml` publishes `127.0.0.1:3100` (plain HTTP, no sign-in) and nothing else. `compose.edge.yaml` removes that and publishes the edge on 8443 instead. `compose.dev.yaml` publishes the rest on loopback for development and tests only. Do not add a `ports:` entry to any other service in `compose.yaml`, do not bind anything to `0.0.0.0` by default, and do not run the dev file on a shared machine. Opening the plain app to a network is the user's choice (`WEB_BIND`), never a default.
+- **Everything is published on loopback only, and the writable server not at all.** `compose.aura.yaml` (in the `grandstack` repository, whose other overlays publish on all interfaces) binds every port to `127.0.0.1`, because this app can delete databases. `compose.aura-edge.yaml` removes them all and publishes the edge on 8443. Do not bind anything to `0.0.0.0` by default; opening it to a network is the user's choice (`EDGE_BIND`).
 - **The edge refuses to start without a hashed sign-in list and a certificate.** Do not add a way around that. Secrets live in `edge/secrets/` (git-ignored, mode 700); `scripts/init-env.sh` makes them and never replaces an existing one.
 - **The app is one origin.** The browser calls `/graphql` on its own origin; the web server (or the edge in front of it) forwards it to the gateway. Do not add a cross-origin call, an inline script or style, or a third-party resource: the content security policy would block it, and the browser run would fail on the console error.
 - **nginx caches addresses at start unless told not to.** The edge uses a resolver and variables in `proxy_pass` so a restarted gateway is found again. Keep that. `add_header` in a location replaces the server's headers, so the security headers are included again where one is added.

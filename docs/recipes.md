@@ -6,12 +6,14 @@ Step-by-step changes. Run commands from the repo root of `grandstack-web-aura`. 
 
 ## Start the stack for development
 
+Clone `grandstack`, `grandstack-server`, `grandstack-federation` and this repository side by side (the first three on their `aura-model` branch until `MODEL` and `READ_ONLY` are merged), then from the `grandstack` folder:
+
 ```sh
-scripts/init-env.sh                                                  # once: .env with the keys
-podman compose -p gwa -f compose.yaml -f compose.dev.yaml up -d --build
+(cd ../grandstack-web-aura && scripts/init-env.sh)                      # once: SECRET_KEY into grandstack/.env
+docker compose -f compose.yaml -f compose.aura.yaml up --build
 ```
 
-The app is at http://localhost:3100 (connect with `mock-client` and `mock-secret`). `compose.dev.yaml` also publishes the gateway (4100), subgraphs (4001, 4010), mock-aura (4020) and Neo4j (7475, 7688) on loopback. Never use that file where other people can reach the machine.
+The app is at http://localhost:3000 (connect with `mock-client` and `mock-secret`). The same overlay publishes the gateway (4000), the read-only server (4001), the Aura subgraph (4010), mock-aura (4020) and Neo4j (7474, 7687), on this machine only. `down -v` deletes the Aura data and the sealed secrets; it does not touch the Movies setup's data.
 
 ## Show a new field Aura returns
 
@@ -19,8 +21,8 @@ Example: Aura adds `example_field` to the instance details, and you want it on t
 
 1. Put the field in `docs/aura_api_spec_v1-2.yaml` and run `npm run generate:api`. Compare a **real** response too: real Aura has differed from its spec (`graph_nodes` is a number, not a string), and mock-aura follows the spec so it cannot catch that.
 2. In `aura/src/sync.ts`, add it to `instanceProperties`. Store text fields with `String(value)` if the type is uncertain.
-3. In `store/schema/schema.graphql`, add `exampleField: String` to `Instance`, with a description.
-4. Start the stack with the dev file and run `npm run compose:supergraph`, then commit `gateway/supergraph.graphql`. CI fails if the committed file is not what the running subgraphs compose to.
+3. In `models/aura/schema.graphql`, add `exampleField: String` to `Instance`, with a description. The servers read the model at start, so restart them (`docker compose ... up -d --force-recreate server store-writer`).
+4. With the stack up, run `npm run compose:supergraph`, then commit `gateway/supergraph.graphql`, and recreate the gateway so it picks the file up.
 5. In `web/src/graphql/documents.ts`, add `exampleField` to `DetailQuery`, run `npm run codegen -w web`, and render it in `web/src/pages/Detail.tsx`.
 6. Add a case to `aura/test/sync-shapes.test.ts` for each shape you have seen (number, string, missing).
 7. Check: `npm run typecheck && npm test`, then look at the instance page.
@@ -42,7 +44,7 @@ Example: let `example_setting` be changed with Aura's PATCH. A change touches ev
 
 Example: a new operation such as a snapshot. Follow how Pause was added.
 
-1. `store/schema/schema.graphql`: add the value to `OperationKind` (if it is not there) and recompose the supergraph.
+1. `models/aura/schema.graphql`: add the value to `OperationKind` (if it is not there) and recompose the supergraph.
 2. `aura/src/operations/state.ts`: add it to `OperationKind` (or `PlannableKind` if it targets an existing instance).
 3. `aura/src/operations/diff.ts`: say what the review shows. `plan.ts`: add the checks it needs (which statuses it is allowed in) in `guardKind`.
 4. `aura/src/client.ts`: add the request. A change must **not** be retried after a 5xx or a lost connection. Use `request` or `requestWithStatus` with a method other than GET: a 5xx is retried only for GET.
@@ -90,10 +92,10 @@ mock-aura has fault injection for testing failure paths. Set it in a test with `
 ## Change the sign-in password, or serve a phone
 
 ```sh
-EDGE_PASSWORD=your-password scripts/init-env.sh --new-password              # or leave it out for a random one
+EDGE_PASSWORD=your-password scripts/init-env.sh --new-password              # or leave it out for a random one (run from this repository)
 EDGE_SAN="IP:192.168.0.5,DNS:mylaptop.local" scripts/init-env.sh --new-cert
-echo "EDGE_BIND=0.0.0.0" >> .env
-podman compose -p gwa -f compose.yaml -f compose.edge.yaml up -d --force-recreate edge
+echo "EDGE_BIND=0.0.0.0" >> ../grandstack/.env
+(cd ../grandstack && docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-edge.yaml up -d --force-recreate edge)
 ```
 
 Then open `https://192.168.0.5:8443` on the phone and accept the certificate warning. A password you choose is as strong as you make it: the edge only limits guessing to about 20 requests a second per address. Read [deploying.md](deploying.md) first.
@@ -106,7 +108,7 @@ Read [real-account-checklist.md](real-account-checklist.md). Then set `AURA_BASE
 
 ```sh
 npm run typecheck && npm test && npm run docs:check
-# with a Neo4j (see testing.md), for changes to store/ or aura/:
+# with a Neo4j and ../grandstack-server built (see testing.md), for changes to aura/ or models/:
 NEO4J_TEST_URI=bolt://localhost:7688 NEO4J_TEST_PASSWORD=... npm test
 # with a fresh stack:
 npm run e2e -w web

@@ -16,7 +16,7 @@ Code: `web/src/pages/Setup.tsx`, `aura/src/service.ts` (`connect`), `aura/src/cl
 
 Code: `aura/src/sync.ts`, `aura/src/service.ts`.
 
-- A sync reads the tenants, each tenant's instance options, the instance list and then each instance's details, and writes the store through its internal endpoint. It runs at start-up when an account is connected, every 15 minutes (`SYNC_INTERVAL_MS`), and on **Sync now**. Only one runs at a time.
+- A sync reads the tenants, each tenant's instance options, the instance list and then each instance's details, and writes the store through the writable server. It runs at start-up when an account is connected, every 15 minutes (`SYNC_INTERVAL_MS`), and on **Sync now**. Only one runs at a time.
 - Each run is recorded as a `SyncRun`: SUCCEEDED, SLOWED when Aura asked it to wait, or FAILED with a plain-words reason. A failed run keeps what the store already had.
 - It is idempotent. An instance Aura no longer lists is marked `deletedInAuraAt` once and kept.
 - **Non-obvious (list is a summary):** `GET /instances` returns only id, name, tenant, cloud and created time. Status, size and the rest need one `GET /instances/{id}` each, so a sync costs one request per instance plus a few. A real account with three tenants and one instance syncs in about 13 seconds and 7 requests.
