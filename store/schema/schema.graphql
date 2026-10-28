@@ -1,0 +1,312 @@
+# Copyright (c) "Neo4j"
+# Neo4j Sweden AB [http://neo4j.com]
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"])
+# Timestamps are ISO 8601 strings in UTC (for example 2026-10-28T09:03:00Z), set by the aura subgraph. They sort correctly as text.
+# They are not the DateTime scalar, because the library formats that with the APOC plugin, which a plain Neo4j image does not have.
+
+"""Whether the Aura account is currently connected."""
+enum ConnectionStatus {
+  """Credentials are stored and the account is being synced."""
+  CONNECTED
+  """The stored client secret has been deleted. Instances, passwords and history are kept."""
+  DISCONNECTED
+}
+
+"""The coarse state of an instance, derived from the 13 statuses the Aura API reports."""
+enum InstanceStatusGroup {
+  """running."""
+  READY
+  """paused or suspended."""
+  STOPPED
+  """creating, updating, pausing, resuming, suspending, loading, restoring, overwriting or destroying. Edit, pause and delete are locked."""
+  IN_PROGRESS
+  """loading failed."""
+  FAILED
+}
+
+"""What an operation does to an instance."""
+enum OperationKind {
+  """Create a new instance."""
+  CREATE
+  """Rename, resize or change the vector and analytics settings."""
+  UPDATE
+  """Delete an instance. Irreversible."""
+  DELETE
+  """Pause an instance."""
+  PAUSE
+  """Resume a paused instance."""
+  RESUME
+}
+
+"""Where an operation is in plan, review, confirm, progress."""
+enum OperationStatus {
+  """Planned and shown for review. Nothing has been sent to Aura."""
+  PLANNED
+  """Confirmed by a person. The reconciler may now call Aura."""
+  CONFIRMED
+  """Sent to Aura and being followed until the instance settles."""
+  RUNNING
+  """Finished as planned."""
+  SUCCEEDED
+  """Aura rejected it or the instance ended in a failed state."""
+  FAILED
+  """Withdrawn before it was sent."""
+  CANCELLED
+}
+
+"""State of one step in an operation's timeline."""
+enum StepStatus {
+  """Not started."""
+  PENDING
+  """In progress."""
+  ACTIVE
+  """Finished."""
+  DONE
+  """Failed."""
+  FAILED
+}
+
+"""How a sync run ended."""
+enum SyncStatus {
+  """Still running."""
+  RUNNING
+  """Finished without trouble."""
+  SUCCEEDED
+  """Finished, but Aura asked us to slow down and we retried."""
+  SLOWED
+  """Stopped with an error."""
+  FAILED
+}
+
+"""The Aura account this app is connected to. Version 1 has exactly one."""
+type AuraAccount @node {
+  """Stable id. The single account uses "default"."""
+  id: ID!
+  """Short name shown in the interface."""
+  label: String!
+  """Masked client id, for example a1b2....a7b8. The full id and the secret are never stored in this graph."""
+  clientIdHint: String
+  """Whether the account is connected."""
+  status: ConnectionStatus!
+  """When the account was first connected."""
+  connectedAt: String
+  """When the last sync run finished."""
+  lastSyncAt: String
+  """Tenants (Aura projects) in this account."""
+  tenants: [Tenant!]! @relationship(type: "HAS_TENANT", direction: OUT)
+}
+
+"""An Aura project. The Aura API calls it a tenant in its paths."""
+type Tenant @node {
+  """The tenant id Aura assigns."""
+  auraId: String!
+  """Project name."""
+  name: String!
+  """When this tenant's instance configurations were last read from Aura."""
+  configsSyncedAt: String
+  """When this tenant was last read from Aura."""
+  syncedAt: String
+  """The account this tenant belongs to."""
+  account: [AuraAccount!]! @relationship(type: "HAS_TENANT", direction: IN)
+  """Instances in this tenant."""
+  instances: [Instance!]! @relationship(type: "HAS_INSTANCE", direction: OUT)
+  """Everything this tenant can create. They fill the create and edit drop-downs."""
+  configurations: [InstanceConfiguration!]! @relationship(type: "OFFERS", direction: OUT)
+}
+
+"""One combination a tenant can create, as Aura lists it. Memory and storage come as a pair."""
+type InstanceConfiguration @node {
+  """Stable hash of cloud provider, region, type, memory, storage and version, so a sync can upsert and remove stale options."""
+  key: String!
+  """gcp, aws or azure."""
+  cloudProvider: String!
+  """Region id, for example europe-west1."""
+  region: String!
+  """Human-friendly region name, for example Belgium (europe-west1)."""
+  regionName: String!
+  """Aura instance type, for example professional-db. The interface shows it as a tier."""
+  type: String!
+  """Memory, for example 8GB."""
+  memory: String!
+  """Storage that goes with the memory, for example 16GB."""
+  storage: String!
+  """Neo4j version, for example 5."""
+  version: String!
+  """When this option was last seen in Aura."""
+  syncedAt: String
+  """The tenant that can create it."""
+  tenant: [Tenant!]! @relationship(type: "OFFERS", direction: IN)
+}
+
+"""A cloud provider, used as a gallery tag."""
+type CloudProvider @node {
+  """gcp, aws or azure."""
+  name: String!
+  """Instances running there."""
+  instances: [Instance!]! @relationship(type: "ON_CLOUD", direction: IN)
+}
+
+"""An Aura tier (the API's instance type), used as a gallery tag."""
+type Tier @node {
+  """The API value, for example business-critical."""
+  type: String!
+  """Display name, for example AuraDB Business Critical."""
+  label: String!
+  """Instances of this tier."""
+  instances: [Instance!]! @relationship(type: "HAS_TIER", direction: IN)
+}
+
+"""
+A cached Aura instance. This is the stored copy. A federated entity, so the aura subgraph can add live data to it.
+The password is not a field here. See hasStoredPassword and the reveal action in the aura subgraph.
+"""
+type Instance @node @key(fields: "auraId") {
+  """The instance id Aura assigns, for example a1b2c3d4."""
+  auraId: String!
+  """Instance name, 1 to 30 characters."""
+  name: String!
+  """The status Aura reported: creating, destroying, running, pausing, paused, suspending, suspended, resuming, loading, loading failed, restoring, updating or overwriting."""
+  status: String!
+  """The coarse group the status belongs to."""
+  statusGroup: InstanceStatusGroup!
+  """URL to connect to the instance with."""
+  connectionUrl: String
+  """Region id, for example europe-west1."""
+  region: String
+  """Memory, for example 8GB."""
+  memory: String
+  """Storage, for example 16GB. Free instances have none."""
+  storage: String
+  """Neo4j version, for example 5."""
+  version: String
+  """Whether vector optimization is on."""
+  vectorOptimized: Boolean
+  """Whether the Graph Analytics plugin is on."""
+  graphAnalyticsPlugin: Boolean
+  """Number of secondaries. Only Virtual Dedicated Cloud instances report it."""
+  secondariesCount: Int
+  """Change data capture mode (OFF, DIFF or FULL). Only Virtual Dedicated Cloud and Business Critical report it."""
+  cdcEnrichmentMode: String
+  """Metrics integration endpoint for the instance."""
+  metricsIntegrationUrl: String
+  """Number of nodes. Aura reports it only for free instances."""
+  graphNodes: String
+  """Number of relationships. Aura reports it only for free instances."""
+  graphRelationships: String
+  """Customer managed key id, if one encrypts the instance."""
+  customerManagedKeyId: String
+  """When Aura created the instance."""
+  createdAt: String
+  """When this copy was last refreshed from Aura."""
+  syncedAt: String
+  """Set when the instance was no longer found in Aura. The record is kept for history."""
+  deletedInAuraAt: String
+  """The tenant it belongs to."""
+  tenant: [Tenant!]! @relationship(type: "HAS_INSTANCE", direction: IN)
+  """Its cloud provider, as a tag."""
+  cloud: [CloudProvider!]! @relationship(type: "ON_CLOUD", direction: OUT)
+  """Its tier, as a tag."""
+  tier: [Tier!]! @relationship(type: "HAS_TIER", direction: OUT)
+  """Changes made to it through this app."""
+  operations: [Operation!]! @relationship(type: "TARGETS", direction: IN)
+  """Whether this app holds the instance's password. False for instances that were found by a sync instead of created here."""
+  hasStoredPassword: Boolean!
+    @cypher(
+      statement: """
+      RETURN EXISTS { (this)-[:HAS_CREDENTIAL]->(:InstanceCredential) } AS stored
+      """
+      columnName: "stored"
+    )
+  """Username that goes with the stored password, if any."""
+  credentialUsername: String
+    @cypher(
+      statement: """
+      OPTIONAL MATCH (this)-[:HAS_CREDENTIAL]->(c:InstanceCredential)
+      RETURN c.username AS username
+      """
+      columnName: "username"
+    )
+  """How many times the stored password has been shown."""
+  passwordRevealCount: Int!
+    @cypher(
+      statement: """
+      OPTIONAL MATCH (this)-[:HAS_CREDENTIAL]->(c:InstanceCredential)
+      RETURN coalesce(c.revealCount, 0) AS n
+      """
+      columnName: "n"
+    )
+}
+
+"""A change made through this app: planned, reviewed, confirmed, then applied to Aura. Also the audit log."""
+type Operation @node {
+  """Unique id."""
+  id: ID! @id
+  """What it does."""
+  kind: OperationKind!
+  """Where it is in plan, review, confirm, progress."""
+  status: OperationStatus!
+  """The wanted state as JSON text. Never contains a password."""
+  desired: String
+  """The instance as it was when planned, as JSON text."""
+  before: String
+  """What changes, as JSON text, for the review screen."""
+  diff: String
+  """The target instance's refreshed-at time when planned. A confirm is refused if the instance changed since."""
+  basedOnSyncedAt: String
+  """Who asked for it (the signed-in user)."""
+  requestedBy: String
+  """When it was planned."""
+  createdAt: String!
+  """When it last changed."""
+  updatedAt: String!
+  """When a person confirmed it."""
+  confirmedAt: String
+  """When it finished, successfully or not."""
+  finishedAt: String
+  """Why it failed, in plain words."""
+  error: String
+  """The instance it changes. Empty for a create until the instance exists."""
+  target: [Instance!]! @relationship(type: "TARGETS", direction: OUT)
+  """Its timeline."""
+  steps: [OperationStep!]! @relationship(type: "HAS_STEP", direction: OUT)
+}
+
+"""One line in an operation's progress timeline."""
+type OperationStep @node {
+  """Order within the operation, starting at 1."""
+  seq: Int!
+  """What this step is, for example Request sent to Aura."""
+  label: String!
+  """Its state."""
+  status: StepStatus!
+  """When it happened."""
+  at: String
+  """Extra words, for example the Aura status being waited on."""
+  detail: String
+  """The operation it belongs to."""
+  operation: [Operation!]! @relationship(type: "HAS_STEP", direction: IN)
+}
+
+"""One run of the sync from Aura into this store."""
+type SyncRun @node {
+  """Unique id."""
+  id: ID! @id
+  """When it started."""
+  startedAt: String!
+  """When it finished."""
+  finishedAt: String
+  """How it ended."""
+  status: SyncStatus!
+  """Tenants read."""
+  tenants: Int
+  """Instances read."""
+  instances: Int
+  """Instance configurations read."""
+  configurations: Int
+  """Aura API requests made."""
+  requests: Int
+  """Retries after a 429 or a 5xx."""
+  retries: Int
+  """Why it stopped, in plain words."""
+  error: String
+}

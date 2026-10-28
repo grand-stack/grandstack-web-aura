@@ -1,0 +1,19 @@
+{
+  "name": "@gwa/aura",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The aura subgraph: wraps the Aura REST API, syncs it into the store and applies confirmed changes",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "generate:api": "openapi-typescript ../docs/aura_api_spec_v1-2.yaml -o src/generated/aura-api.d.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}

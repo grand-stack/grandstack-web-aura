@@ -1,0 +1,32 @@
+{
+  "name": "grandstack-web-aura",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "A mobile-friendly web UI for managing Neo4j Aura, with a Neo4j store that caches Aura's state and a federated GraphQL supergraph",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "store",
+    "aura",
+    "mock-aura"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "generate:api": "npm run generate:api -w aura"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  },
+  "overrides": {
+    "@apollo/subgraph": "2.14.4",
+    "@graphql-tools/utils": "12.1.0",
+    "uuid": "11.1.1"
+  }
+}

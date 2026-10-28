@@ -1,0 +1,25 @@
+{
+  "name": "@gwa/store",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The store subgraph: a Neo4j cache of Aura's state, served as GraphQL (Apollo Federation 2)",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:integration": "vitest run test/integration.test.ts"
+  },
+  "dependencies": {
+    "@neo4j/graphql": "7.6.4",
+    "graphql": "16.14.2",
+    "graphql-yoga": "5.24.6",
+    "neo4j-driver": "6.2.0"
+  }
+}
