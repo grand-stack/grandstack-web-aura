@@ -181,11 +181,69 @@ type ConfirmedChange @join__type(graph: AURA)  {
   status: String!
 }
 
+"""
+A stored password, shown once. This is the only place a password is ever returned.
+"""
+type RevealedPassword @join__type(graph: AURA)  {
+  """
+  The username that goes with it.
+  """
+  username: String!
+  """
+  The password. Do not log it or keep it.
+  """
+  password: String!
+}
+
+"""
+One thing that differs between the stored copy of an instance and Aura.
+"""
+type InstanceDifference @join__type(graph: AURA)  {
+  """
+  The field, for example memory.
+  """
+  field: String!
+  """
+  What to call it.
+  """
+  label: String!
+  """
+  What the stored copy says.
+  """
+  stored: String!
+  """
+  What Aura says now.
+  """
+  live: String!
+}
+
+"""
+The result of comparing an instance with Aura. Nothing is changed.
+"""
+type InstanceCheck @join__type(graph: AURA)  {
+  """
+  When Aura was asked (ISO 8601, UTC).
+  """
+  checkedAt: String!
+  """
+  False when Aura no longer has the instance.
+  """
+  inAura: Boolean!
+  """
+  What differs. Empty when the stored copy is right.
+  """
+  differences: [InstanceDifference!]!
+}
+
 type Query @join__type(graph: AURA)  @join__type(graph: STORE)  {
   """
   The state of the connection to Aura.
   """
   auraSetup: AuraSetup! @join__field(graph: AURA) 
+  """
+  Compare one instance with what Aura says now, without changing the stored copy.
+  """
+  checkInstance(instanceId: String!) : InstanceCheck! @join__field(graph: AURA) 
   auraAccountsConnection(first: Int, after: String, where: AuraAccountWhere, sort: [AuraAccountSort!]) : AuraAccountsConnection! @join__field(graph: STORE) 
   auraAccounts(where: AuraAccountWhere, limit: Int, offset: Int, sort: [AuraAccountSort!]) : [AuraAccount!]! @join__field(graph: STORE) 
   tenantsConnection(first: Int, after: String, where: TenantWhere, sort: [TenantSort!]) : TenantsConnection! @join__field(graph: STORE) 
@@ -265,10 +323,25 @@ type Mutation @join__type(graph: AURA)  {
   """
   planResume(instanceId: String!) : PlannedChange!
   """
-  Confirm a planned change: send it to Aura, once, and watch until the instance shows it. Refused if the instance changed since it
-  was planned, if another change is under way for it, or if it was already confirmed or cancelled.
+  Plan creating an instance. The choices are checked against what the tenant is offered. Nothing is sent to Aura until
+  confirmOperation.
   """
-  confirmOperation(operationId: ID!) : ConfirmedChange!
+  planCreate(input: InstanceCreate!) : PlannedChange!
+  """
+  Plan deleting an instance. Nothing is sent to Aura until confirmOperation, which for a delete needs the name typed exactly.
+  """
+  planDelete(instanceId: String!) : PlannedChange!
+  """
+  Confirm a planned change: send it to Aura, once, and watch until the instance shows it. Refused if the instance changed since it
+  was planned, if another change is under way for it, or if it was already confirmed or cancelled. A delete also needs typedName
+  to be the instance's name, exactly.
+  """
+  confirmOperation(operationId: ID!, typedName: String) : ConfirmedChange!
+  """
+  Show the stored password of an instance, once per call, and record that it was shown. Refused when no password is stored, as
+  for an instance found by a sync.
+  """
+  revealInstancePassword(instanceId: String!) : RevealedPassword!
   """
   Withdraw a planned change before it is sent. Refused once it has been confirmed.
   """
@@ -1612,6 +1685,48 @@ input InstanceChange @join__type(graph: AURA)  {
   vectorOptimized: Boolean
   """
   Turn the Graph Analytics plugin on or off.
+  """
+  graphAnalyticsPlugin: Boolean
+}
+
+"""
+What to create. Every choice must be a combination the tenant is offered, which the store holds.
+"""
+input InstanceCreate @join__type(graph: AURA)  {
+  """
+  The tenant (Aura project) to create it in.
+  """
+  tenantId: String!
+  """
+  gcp, aws or azure.
+  """
+  cloudProvider: String!
+  """
+  The region id, for example europe-west1.
+  """
+  region: String!
+  """
+  The Aura tier, for example professional-db.
+  """
+  type: String!
+  """
+  The memory, for example 8GB.
+  """
+  memory: String!
+  """
+  The storage that goes with the memory. Filled in from the offered combination if left out.
+  """
+  storage: String
+  """
+  A name, 1 to 30 characters.
+  """
+  name: String!
+  """
+  Turn vector optimization on.
+  """
+  vectorOptimized: Boolean
+  """
+  Turn the Graph Analytics plugin on.
   """
   graphAnalyticsPlugin: Boolean
 }

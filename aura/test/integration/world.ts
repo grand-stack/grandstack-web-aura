@@ -20,7 +20,7 @@ export const MOCK_CLIENT_ID = "a1b2c3d4e5f6a7b8";
 export const MOCK_CLIENT_SECRET = "s3cret-sentinel-value-9f8e7d";
 export const INTERNAL_TOKEN = "integration-internal-token-1234";
 
-const OUR_LABELS = new Set(["AuraAccount", "Tenant", "InstanceConfiguration", "CloudProvider", "Tier", "Instance", "Operation", "OperationStep", "SyncRun", "InstanceCredential", "AuraSecret"]);
+const OUR_LABELS = new Set(["AuraAccount", "Tenant", "InstanceConfiguration", "CloudProvider", "Tier", "Instance", "Operation", "OperationStep", "SyncRun", "InstanceCredential", "AuraSecret", "AuditEvent"]);
 
 export interface World {
   driver: Driver;

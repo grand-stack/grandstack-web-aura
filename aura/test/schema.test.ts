@@ -98,8 +98,30 @@ describe("planning and confirming changes", () => {
     const res = await run(`mutation { planUpdate(instanceId: "i", changes: { type: "enterprise-db" }) { operationId } }`);
     expect(res.errors).toBeDefined();
   });
-  it("has nothing that deletes or creates yet", () => {
-    expect(typeDefs).not.toMatch(/planDelete|planCreate|deleteInstance|createInstance/);
+  it("plans a create and a delete, and confirms a delete with the name that was typed", async () => {
+    const { run, calls } = withOps({
+      planCreate: async (...args: unknown[]) => (calls.push({ method: "planCreate", args }), planned),
+      planDelete: async (...args: unknown[]) => (calls.push({ method: "planDelete", args }), planned),
+      confirm: async (...args: unknown[]) => (calls.push({ method: "confirm", args }), { operationId: "op-1", status: "CONFIRMED" }),
+    });
+    const input = { tenantId: "t1", cloudProvider: "gcp", region: "europe-west1", type: "professional-db", memory: "8GB", name: "new-one" };
+    expect((await run(`mutation($i: InstanceCreate!) { planCreate(input: $i) { operationId } }`, { i: input })).data.planCreate).toEqual({ operationId: "op-1" });
+    expect((await run(`mutation { planDelete(instanceId: "i1") { operationId } }`)).data.planDelete).toEqual({ operationId: "op-1" });
+    await run(`mutation { confirmOperation(operationId: "op-1", typedName: "orders-prod") { status } }`);
+    expect(calls.map((c) => c.args)).toEqual([[input], ["i1"], ["op-1", "orders-prod"]]);
+  });
+  it("has no mutation that deletes or creates directly, only plans", () => {
+    expect(typeDefs).not.toMatch(/\b(deleteInstance|createInstance)\b/);
+  });
+  it("shows a password only through revealInstancePassword", async () => {
+    const { run, calls } = fake({ revealPassword: async (...args: unknown[]) => (calls.push({ method: "reveal", args }), { username: "neo4j", password: "p4ss" }) });
+    expect((await run(`mutation { revealInstancePassword(instanceId: "i1") { username password } }`)).data.revealInstancePassword).toEqual({ username: "neo4j", password: "p4ss" });
+    expect(calls).toEqual([{ method: "reveal", args: ["i1"] }]);
+  });
+  it("compares an instance with Aura without changing anything", async () => {
+    const { run } = fake({ checkInstance: async () => ({ checkedAt: "2026-10-28T10:00:00Z", inAura: true, differences: [{ field: "name", label: "Name", stored: "a", live: "b" }] }) });
+    const res = await run(`{ checkInstance(instanceId: "i1") { checkedAt inAura differences { field label stored live } } }`);
+    expect(res.data.checkInstance.differences).toEqual([{ field: "name", label: "Name", stored: "a", live: "b" }]);
   });
 });
 
@@ -128,7 +150,12 @@ describe("errors", () => {
 describe("what the schema exposes", () => {
   it("only ever takes the secret as an argument and never returns it", () => {
     const outputFields = [...typeDefs.matchAll(/^\s{4}(\w+)(?:\([^)]*\))?:\s*[\w!\[\]]+/gm)].map((m) => m[1]!);
-    expect(outputFields.filter((f) => /secret|password|cipher|nonce|token/i.test(f))).toEqual([]);
+    // The one deliberate exception: RevealedPassword, the result of revealInstancePassword
+    const revealed = /type RevealedPassword \{[\s\S]*?\n  \}/.exec(typeDefs)![0];
+    const others = typeDefs.replace(revealed, "");
+    const fields = [...others.matchAll(/^\s{4}(\w+)(?:\([^)]*\))?:\s*[\w!\[\]]+/gm)].map((m) => m[1]!);
+    expect(fields.filter((f) => /secret|password|cipher|nonce|token/i.test(f) && f !== "revealInstancePassword")).toEqual([]);
+    expect(outputFields.filter((f) => /password/i.test(f)).sort()).toEqual(["password", "revealInstancePassword"]);
     expect(typeDefs.match(/clientSecret/g)).toHaveLength(1); // only the argument of connectAura
   });
 

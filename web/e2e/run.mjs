@@ -249,7 +249,7 @@ check("properties: tenant, tier, region, size, created", await page.evaluate(() 
 check("tags on the page lead back to filtered lists", await page.$$eval(".meta .tag", (a) => a.map((x) => x.getAttribute("href")).every((h) => h.startsWith("/instances?"))));
 await page.click(".copyrow .iconbtn");
 check("copying says so", await waitFor(() => /copied/i.test(document.querySelector(".copyrow .iconbtn")?.getAttribute("aria-label") ?? "")));
-check("the detail page offers no delete button yet", (await count("button.btn-danger")) === 0);
+check("the detail page offers Delete, named", (await texts(".actionbar button.btn-danger")).join("|") === "Delete");
 check("detail fits a phone", !(await overflowing()));
 await accessibility("detail");
 await shot("07-detail-mobile");
@@ -297,7 +297,7 @@ const syncAndWait = async () => {
 // Edit: rename and resize recs-staging on a phone
 await open("/instances/c9d8e7f6", PHONE);
 await waitText("h1", "recs-staging");
-check("a running instance offers Edit and Pause, not Resume", (await texts(".actionbar .btn")).join("|") === "Edit|Pause", (await texts(".actionbar .btn")).join("|"));
+check("a running instance offers Edit and Pause, not Resume", (await texts(".actionbar .btn")).join("|") === "Edit|Pause|Delete", (await texts(".actionbar .btn")).join("|"));
 await page.click(".actionbar a[href$='/edit']");
 check("the edit form opens", await waitText("h1", "Edit recs-staging"));
 check("Review changes is off until something differs", await page.$eval(".actionbar button[type=submit]", (b) => b.disabled));
@@ -358,7 +358,7 @@ await clickByText("button", "Confirm and apply");
 check("the pause succeeds", await waitText(".status", "Succeeded", 60000));
 await open("/instances/d4e5f6a7", DESKTOP);
 await waitText("h1", "billing-staging");
-check("a paused instance offers Resume, not Pause", (await texts(".actionbar .btn")).join("|") === "Edit|Resume", (await texts(".actionbar .btn")).join("|"));
+check("a paused instance offers Resume, not Pause", (await texts(".actionbar .btn")).join("|") === "Edit|Resume|Delete", (await texts(".actionbar .btn")).join("|"));
 await clickByText("button", "Resume");
 await waitText(".status", "Planned, not sent");
 await clickByText("button", "Confirm and apply");
@@ -450,6 +450,120 @@ check("reconnecting lands on the home page, whatever page you were on, with the 
   (await waitText("h1", "Find an instance", 30000)) && url().pathname === "/" && (await waitText(".hero .sub", "5 instances across 2 tenants", 30000)), `${url().pathname} ${await text("h1")} / ${await text(".hero .sub")}`);
 const again = await gql(`{ instancesConnection { totalCount } tenantsConnection { totalCount } instanceConfigurationsConnection { totalCount } auraAccounts { status } }`);
 check("reconnecting duplicates nothing", again.instancesConnection.totalCount === 6 && again.tenantsConnection.totalCount === 3 && again.instanceConfigurationsConnection.totalCount === 48 && again.auraAccounts.length === 1 && again.auraAccounts[0].status === "CONNECTED", JSON.stringify(again));
+
+// ───────────────────────────── 10b. Create, show the password, check, delete ─────────────────────────────
+const auraCount = async () => (await (await fetch(`${MOCK}/v1/instances`, { headers: { Authorization: `Bearer ${await auraToken()}` } })).json()).data.length;
+const radio = (name, labelStart) => page.evaluate(([n, t]) => { const l = [...document.querySelectorAll(`input[name=${n}]`)].map((i) => i.closest("label")).find((x) => x.textContent.trim().startsWith(t)); if (!l) return false; l.click(); return true; }, [name, labelStart]);
+const radioCount = (name) => count(`input[name=${name}]`);
+const topbarHeight = () => page.$eval(".topbar", (e) => e.getBoundingClientRect().height);
+const NAME = "e2e-created";
+
+await open("/", PHONE);
+await waitText("h1", "Find an instance");
+check("home has a New instance button, and the phone top bar still fits on one line and does not scroll sideways", (await count("a.newlink")) === 1 && (await topbarHeight()) < 80 && !(await overflowing()), String(await topbarHeight()));
+await page.click("a.newlink");
+check("it opens the first step", (await waitText("h1", "Which tenant?")) && url().pathname === "/instances/new");
+check("Continue is off until a tenant is chosen", await page.evaluate(() => [...document.querySelectorAll(".actionbar button")].find((b) => b.textContent === "Continue").disabled));
+check("every tenant is offered", (await radioCount("tenant")) === 3, String(await radioCount("tenant")));
+await accessibility("create");
+await shot("76-create-tenant-mobile");
+await radio("tenant", "Acme Staging");
+await clickByText("button", "Continue");
+check("the cloud step offers only what the tenant is offered", (await waitText("h1", "Which cloud?")) && (await radioCount("cloud")) >= 1);
+await radio("cloud", "GCP");
+await clickByText("button", "Continue");
+await waitText("h1", "Where, and which tier?");
+check("the tier appears only once a region is chosen", (await radioCount("tier")) === 0);
+await page.evaluate(() => document.querySelector("input[name=region]").closest("label").click());
+check("the tiers offered in that region show", await waitFor(() => document.querySelectorAll("input[name=tier]").length >= 1));
+await radio("tier", "AuraDB Professional");
+check("the choices so far can be changed", (await texts(".tagrow .tag")).length >= 1);
+await clickByText("button", "Continue");
+check("the size step offers memory and storage pairs", (await waitText("h1", "How big?")) && (await radioCount("size")) >= 2);
+await shot("77-create-size-mobile");
+await page.evaluate(() => document.querySelector("input[name=size]").closest("label").click());
+await clickByText("button", "Continue");
+check("the last step asks for a name", await waitText("h1", "Name it"));
+check("Review is off until it has a name", await page.evaluate(() => [...document.querySelectorAll(".actionbar button")].find((b) => b.textContent === "Review").disabled));
+await typeInto("#name", NAME);
+check("the name counter counts", (await text("#name-count")) === `${NAME.length} of 30`, await text("#name-count"));
+check("create steps fit a phone", !(await overflowing()));
+await shot("78-create-name-mobile");
+const instancesBefore = await auraCount();
+await clickByText("button", "Review");
+check("review opens, planned and not sent", (await waitText(".status", "Planned, not sent")) && url().pathname.startsWith("/operations/") && (await waitText("h1", `Create ${NAME}`)), await text("h1"));
+check("the review lists what will be made", (await texts(".diffrow .k")).join("|").startsWith("Name|Tenant|Cloud|Region|Tier|Memory|Storage"), (await texts(".diffrow .k")).join("|"));
+check("a create review shows only the new values", (await count(".diffrow .before")) === 0);
+check("the review warns about billing and the password", (await texts(".banner-warn")).some((t) => t.includes("billed")) && (await texts(".banner-warn")).some((t) => t.includes("password")));
+check("planning a create made nothing in Aura", (await auraCount()) === instancesBefore);
+await accessibility("create-review");
+await shot("79-create-review-mobile");
+await clickByText("button", "Confirm and apply");
+check("the create finishes", await waitText(".status", "Succeeded", 90000));
+check("it says the password is stored", await waitText(".banner", "password Aura gave is stored"));
+check("Aura has one more instance", (await auraCount()) === instancesBefore + 1);
+const made = (await gql(`{ instances(where: { name: { eq: "${NAME}" } }) { auraId hasStoredPassword credentialUsername passwordRevealCount tenant { name } cloud { name } } }`)).instances[0];
+check("the stored copy has the instance, its tenant and cloud, and a stored password", made?.hasStoredPassword === true && made.tenant[0].name === "Acme Staging" && made.cloud[0].name === "gcp" && made.credentialUsername === "neo4j", JSON.stringify(made));
+const realPassword = (await (await fetch(`${MOCK}/__passwords/${made.auraId}`)).json()).password;
+
+// The password stays hidden until the eye is clicked, and each showing is recorded
+await open(`/instances/${made.auraId}`, DESKTOP);
+await waitText("h1", NAME);
+check("the password is hidden when the page loads, and is nowhere in it", (await waitFor(() => document.querySelector("[data-state=hidden]"))) && !(await page.evaluate(() => document.body.innerHTML)).includes(realPassword));
+check("the page says it can be shown", (await count("button[aria-label='Show password']")) === 1);
+await page.click("button[aria-label='Show password']");
+check("clicking the eye shows the real password", await waitFor((p) => document.querySelector("[data-state=shown]")?.textContent === p, realPassword));
+check("the page has a hide button and a copy button for it", (await count("button[aria-label='Hide password']")) === 1 && (await count("button[aria-label='Copy password']")) === 1);
+check("showing it was recorded", await until(async () => (await gql(`{ instances(where: { auraId: { eq: "${made.auraId}" } }) { passwordRevealCount } }`)).instances[0].passwordRevealCount === 1));
+await shot("80-password-shown-desktop");
+await page.click("button[aria-label='Hide password']");
+check("hiding it removes it from the page", await waitFor(() => document.querySelector("[data-state=hidden]")) && !(await page.evaluate(() => document.body.innerHTML)).includes(realPassword));
+check("the password was never put in storage or the URL", !(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).includes(realPassword) && !page.url().includes(realPassword));
+check("the stored password cannot be asked for in a query", (await (await fetch(GATEWAY, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: `{ instances { password passwordCipher } }` }) })).json()).errors?.length > 0);
+check("an instance found by a sync says why it has no password to show", await (async () => { await open("/instances/a1b2c3d4", DESKTOP); await waitText("h1", "orders-elsewhere"); return (await count("button[aria-label='Show password']")) === 0 && (await waitText(".note", "found by a sync")); })());
+
+// Check with Aura: nothing changes until the person syncs
+await open("/instances/c3d4e5f6", DESKTOP);
+await waitText("h1", "search-v2");
+await clickByText("button", "Check with Aura");
+check("a matching instance says so", await waitText("[role=status]", "Matches Aura"));
+await auraPatch("c3d4e5f6", { name: "search-elsewhere" });
+await clickByText("button", "Check with Aura");
+check("a difference is listed, stored against Aura", (await waitText(".diffrow", "search-elsewhere")) && (await texts(".diffrow")).some((t) => t.includes("search-v2")), (await texts(".diffrow")).join("|"));
+check("checking did not change the stored copy", (await gql(`{ instances(where: { auraId: { eq: "c3d4e5f6" } }) { name } }`)).instances[0].name === "search-v2");
+await shot("81-drift-desktop");
+await clickByText("button", "Sync now");
+check("Sync now brings the stored copy up to date", await until(async () => (await gql(`{ instances(where: { auraId: { eq: "c3d4e5f6" } }) { name } }`)).instances[0].name === "search-elsewhere", 30000));
+
+// Delete: cancelling keeps it; deleting needs the name
+await open("/instances/a1b2c3d4", DESKTOP);
+await waitText("h1", "orders-elsewhere");
+await clickByText("button", "Delete");
+check("delete opens a review that says it cannot be undone", (await waitText(".status", "Planned, not sent")) && (await waitText(".banner-warn", "cannot be undone")));
+check("the delete button is off until the name is typed", await page.evaluate(() => [...document.querySelectorAll(".actionbar button")].find((b) => b.textContent.startsWith("Delete")).disabled));
+await clickByText("button", "Cancel");
+check("cancelling a delete keeps the instance", (await waitText(".banner", "Nothing was sent to Aura")) && (await auraCount()) === instancesBefore + 1);
+await open(`/instances/${made.auraId}`, PHONE);
+await waitText("h1", NAME);
+await clickByText("button", "Delete");
+await waitText(".status", "Planned, not sent");
+check("the delete review asks for the name", await waitText("#typed-title", "Type the name"));
+await typeInto("#typed", NAME.toUpperCase());
+check("a name with the wrong case does not turn it on", (await waitText("#typed-hint", "not the name")) && (await page.evaluate(() => [...document.querySelectorAll(".actionbar button")].find((b) => b.textContent.startsWith("Delete")).disabled)));
+await typeInto("#typed", NAME.slice(0, -1));
+check("a partial name does not either", await page.evaluate(() => [...document.querySelectorAll(".actionbar button")].find((b) => b.textContent.startsWith("Delete")).disabled));
+check("the delete review fits a phone", !(await overflowing()));
+await accessibility("delete-review");
+await shot("82-delete-review-mobile");
+await typeInto("#typed", NAME);
+check("the exact name turns it on", (await waitText("#typed-hint", "matches")) && (await page.evaluate(() => !([...document.querySelectorAll(".actionbar button")].find((b) => b.textContent.startsWith("Delete")).disabled))));
+await clickByText("button", "Delete permanently");
+check("the delete finishes", await waitText(".status", "Succeeded", 90000));
+check("Aura no longer has it", (await auraCount()) === instancesBefore);
+check("the record stays, marked removed, and its password is gone", await until(async () => { const i = (await gql(`{ instances(where: { auraId: { eq: "${made.auraId}" } }) { deletedInAuraAt hasStoredPassword } }`)).instances[0]; return i.deletedInAuraAt !== null && i.hasStoredPassword === false; }));
+await shot("83-delete-done-mobile");
+await open(`/instances/${made.auraId}`, DESKTOP);
+check("its page says it is gone and offers no actions", (await waitText(".banner-warn", "no longer in Aura")) && (await count(".actionbar")) === 0);
 
 // ───────────────────────────── 11. Theme ─────────────────────────────
 await open("/", DESKTOP);

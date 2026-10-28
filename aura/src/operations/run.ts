@@ -1,14 +1,22 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
-import { AuraApiError, AuraAuthError, AuraUnreachableError, type AuraClient, type InstanceDetail, type InstanceUpdate } from "../client.js";
+import { AuraApiError, AuraAuthError, AuraUnreachableError, type AuraClient, type InstanceCreate, type InstanceDetail, type InstanceUpdate } from "../client.js";
 import { refreshInstance } from "../sync.js";
 import type { StoreClient } from "../storeClient.js";
 import type { Changes } from "./diff.js";
-import { STEPS, type OperationStatus, type PlannableKind } from "./state.js";
-import { addSteps, loadOperation, moveOperation, setStep, type StoredOperation } from "./store.js";
+import { STEPS, type CreateRequest, type OperationKind, type OperationStatus } from "./state.js";
+import { addSteps, loadOperation, markInstanceDeleted, moveOperation, recordCreatedInstance, setStep, type StoredOperation } from "./store.js";
+
+/** Where an instance's password is kept. Aura shows it once, so it is stored the moment it arrives. */
+export interface CredentialVault {
+  save(auraId: string, username: string, password: string): Promise<void>;
+  link(auraId: string): Promise<void>;
+  delete(auraId: string): Promise<void>;
+}
 
 export interface RunDeps {
   store: StoreClient;
+  vault: CredentialVault;
   aura: AuraClient;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -27,6 +35,8 @@ export const defaultPollDelay = (attempt: number): number => Math.min(15_000, Ma
 interface Expectation {
   /** The stable status the instance reaches when the change is done. */
   status: string;
+  /** True for a delete: the instance is done when Aura no longer has it (a 404), not when it reaches a status. */
+  gone?: boolean;
   send: (aura: AuraClient, id: string) => Promise<number>;
   matches: (detail: InstanceDetail) => boolean;
 }
@@ -41,7 +51,25 @@ export function toAuraBody(changes: Changes): InstanceUpdate {
   };
 }
 
-export function expectation(kind: PlannableKind, changes: Changes = {}): Expectation {
+export function toAuraCreate(r: CreateRequest): InstanceCreate {
+  return {
+    version: r.version,
+    region: r.region,
+    memory: r.memory,
+    storage: r.storage,
+    name: r.name,
+    type: r.type,
+    tenant_id: r.tenantId,
+    cloud_provider: r.cloudProvider,
+    ...(r.vectorOptimized ? { vector_optimized: true } : {}),
+    ...(r.graphAnalyticsPlugin ? { graph_analytics_plugin: true } : {}),
+  };
+}
+
+export function expectation(kind: OperationKind, changes: Changes = {}): Expectation {
+  // A create is sent by sendCreate, which also stores the password, so this one only says what "done" looks like
+  if (kind === "CREATE") return { status: "running", send: async () => { throw new Error("A create is sent by sendCreate"); }, matches: () => true };
+  if (kind === "DELETE") return { status: "destroying", gone: true, send: async (a, id) => (await a.deleteInstance(id), 202), matches: () => true };
   if (kind === "PAUSE") return { status: "paused", send: async (a, id) => (await a.pauseInstance(id), 202), matches: () => true };
   if (kind === "RESUME") return { status: "running", send: async (a, id) => (await a.resumeInstance(id), 202), matches: () => true };
   return {
@@ -103,8 +131,10 @@ export async function runOperation(deps: RunDeps, operationId: string, options: 
   let step = options.alreadySent ? 4 : 2;
 
   const op = await loadOperation(store, operationId);
-  if (!op || !op.targetId) return;
-  const targetId = op.targetId;
+  const isCreate = op?.desired.kind === "CREATE";
+  // A create has no instance until Aura has made one
+  if (!op || (!op.targetId && !isCreate)) return;
+  let targetId = op.targetId ?? "";
 
   const stop = (message: string): never => {
     throw new Stop(step, message);
@@ -119,11 +149,17 @@ export async function runOperation(deps: RunDeps, operationId: string, options: 
       await setStep(store, operationId, 2, "ACTIVE", at());
       if (!(await moveOperation(store, operationId, "CONFIRMED", "RUNNING", {}, at()))) return; // someone else has it
       status = "RUNNING";
-      let answered: number;
-      try {
-        answered = await expected.send(aura, targetId);
-      } catch (err) {
-        return stop(explainFailure(err, "sending"));
+      let answered = 202;
+      if (isCreate) {
+        targetId = await sendCreate(deps, operationId, op.desired.create!, at, stop);
+      } else {
+        try {
+          answered = await expected.send(aura, targetId);
+        } catch (err) {
+          // Deleting what is already gone is done
+          if (!(expected.gone && err instanceof AuraApiError && err.status === 404)) return stop(explainFailure(err, "sending"));
+          answered = 404;
+        }
       }
       await setStep(store, operationId, 2, "DONE", at());
       step = 3;
@@ -137,6 +173,7 @@ export async function runOperation(deps: RunDeps, operationId: string, options: 
     let lastSeen: string | undefined;
     let lostContact = 0;
     let finalDetail: InstanceDetail | undefined;
+    let gone = false;
     for (let attempt = 0; ; attempt++) {
       if (deps.now().getTime() - started > deps.timeoutMs) {
         return stop(`Aura did not show the change within ${spokenDuration(deps.timeoutMs)}. It may still finish; the stored copy will catch up at the next sync.`);
@@ -147,6 +184,11 @@ export async function runOperation(deps: RunDeps, operationId: string, options: 
         detail = await aura.getInstance(targetId);
         lostContact = 0;
       } catch (err) {
+        // A delete is finished when Aura no longer has the instance
+        if (expected.gone && err instanceof AuraApiError && err.status === 404) {
+          gone = true;
+          break;
+        }
         if (err instanceof AuraAuthError || (err instanceof AuraApiError && [401, 403, 404].includes(err.status))) return stop(explainFailure(err, "waiting"));
         // A bad moment (no connection, a server error) is not the end: look again, and give up only if it keeps happening
         if (++lostContact >= 3) return stop(explainFailure(err instanceof AuraApiError ? err : new AuraUnreachableError(), "waiting"));
@@ -157,7 +199,8 @@ export async function runOperation(deps: RunDeps, operationId: string, options: 
         await setStep(store, operationId, 4, "ACTIVE", at(), `Aura says: ${detail.status}`);
       }
       if (detail.status === "loading failed") return stop("Aura reports this instance as 'loading failed'.");
-      if (detail.status === expected.status && expected.matches(detail)) {
+      // A delete is not done while Aura still lists the instance, even as "destroying"
+      if (!expected.gone && detail.status === expected.status && expected.matches(detail)) {
         finalDetail = detail;
         break;
       }
@@ -166,7 +209,13 @@ export async function runOperation(deps: RunDeps, operationId: string, options: 
     await setStep(store, operationId, 4, "DONE", at());
     step = 5;
     await setStep(store, operationId, 5, "ACTIVE", at());
-    await refreshInstance(store, finalDetail, at());
+    if (gone) {
+      // The record stays, marked as gone, so the history does. The stored password goes with the instance.
+      await markInstanceDeleted(store, targetId, at());
+      await deps.vault.delete(targetId);
+    } else if (finalDetail) {
+      await refreshInstance(store, finalDetail, at());
+    }
     await setStep(store, operationId, 5, "DONE", at());
     step = 6;
     await setStep(store, operationId, 6, "DONE", at());
@@ -181,6 +230,31 @@ export async function runOperation(deps: RunDeps, operationId: string, options: 
       console.error(`Could not record the failure of operation ${operationId}`);
     }
   }
+}
+
+/**
+ * Asks Aura to make the instance, and keeps what it answers. Aura shows the password only in this answer, so it is stored first,
+ * before the instance is recorded or any step is marked. Returns the new instance's id. Throws a Stop through `stop` on failure.
+ */
+async function sendCreate(deps: RunDeps, operationId: string, request: CreateRequest, at: () => string, stop: (message: string) => never): Promise<string> {
+  let created;
+  try {
+    created = await deps.aura.createInstance(toAuraCreate(request));
+  } catch (err) {
+    return stop(explainFailure(err, "sending"));
+  }
+  try {
+    await deps.vault.save(created.id, created.username, created.password);
+  } catch {
+    return stop(`Aura created the instance (${created.id}), but this app could not store its password. Aura will not show it again. Sync to see the instance, then reset its password in the Aura Console.`);
+  }
+  try {
+    await recordCreatedInstance(deps.store, operationId, created, request, at());
+    await deps.vault.link(created.id);
+  } catch {
+    return stop(`Aura created the instance (${created.id}) and its password is stored, but this app could not record the instance. Sync to see it.`);
+  }
+  return created.id;
 }
 
 /** Creates the six steps of an operation. Step 1 is already done: it is confirmed. */

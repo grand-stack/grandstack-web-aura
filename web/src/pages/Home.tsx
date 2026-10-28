@@ -55,6 +55,7 @@ export function Home() {
         <span className="eyebrow">Neo4j Aura</span>
         <h1>Find an instance</h1>
         <p className="sub">{data ? `${plural(total, "instance")} across ${plural(tenants.length, "tenant")}` : "Reading the stored copy of your account…"}</p>
+        <div><Link to="/instances/new" className="btn btn-secondary newlink"><Icon name="plus" size={18} />New instance</Link></div>
         <form className="searchbar" onSubmit={submit} role="search">
           <label htmlFor="home-search" className="visually-hidden">Search instances by name</label>
           <input id="home-search" className="input" type="search" placeholder="Search by name" value={q} onChange={(e) => setQ(e.target.value)} />

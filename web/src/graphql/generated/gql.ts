@@ -21,7 +21,12 @@ type Documents = {
     "\n  mutation PlanUpdate($instanceId: String!, $changes: InstanceChange!) {\n    planUpdate(instanceId: $instanceId, changes: $changes) { operationId }\n  }\n": typeof types.PlanUpdateDocument,
     "\n  mutation PlanPause($instanceId: String!) { planPause(instanceId: $instanceId) { operationId } }\n": typeof types.PlanPauseDocument,
     "\n  mutation PlanResume($instanceId: String!) { planResume(instanceId: $instanceId) { operationId } }\n": typeof types.PlanResumeDocument,
-    "\n  mutation Confirm($id: ID!) { confirmOperation(operationId: $id) { operationId status } }\n": typeof types.ConfirmDocument,
+    "\n  mutation PlanCreate($input: InstanceCreate!) { planCreate(input: $input) { operationId } }\n": typeof types.PlanCreateDocument,
+    "\n  mutation PlanDelete($instanceId: String!) { planDelete(instanceId: $instanceId) { operationId } }\n": typeof types.PlanDeleteDocument,
+    "\n  mutation Confirm($id: ID!, $typedName: String) { confirmOperation(operationId: $id, typedName: $typedName) { operationId status } }\n": typeof types.ConfirmDocument,
+    "\n  mutation Reveal($instanceId: String!) { revealInstancePassword(instanceId: $instanceId) { username password } }\n": typeof types.RevealDocument,
+    "\n  query CheckInstance($instanceId: String!) { checkInstance(instanceId: $instanceId) { checkedAt inAura differences { field label stored live } } }\n": typeof types.CheckInstanceDocument,
+    "\n  query CreateOptions {\n    tenants(sort: [{ name: ASC }]) {\n      auraId name\n      configurations { cloudProvider region regionName type memory storage version }\n    }\n    tiers { type label }\n  }\n": typeof types.CreateOptionsDocument,
     "\n  mutation Cancel($id: ID!) { cancelOperation(operationId: $id) }\n": typeof types.CancelDocument,
     "\n  fragment InstanceCardFields on Instance {\n    auraId name status statusGroup memory storage region createdAt deletedInAuraAt\n    tenant { auraId name }\n    cloud { name }\n    tier { type label }\n  }\n": typeof types.InstanceCardFieldsFragmentDoc,
     "\n  query Home {\n    total: instancesConnection(where: { deletedInAuraAt: { eq: null } }) { totalCount }\n    tenants(sort: [{ name: ASC }]) { auraId name instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }\n    cloudProviders(sort: [{ name: ASC }]) { name instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }\n    tiers(sort: [{ label: ASC }]) { type label instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }\n    attention: instances(\n      where: { AND: [{ deletedInAuraAt: { eq: null } }, { statusGroup: { in: [FAILED, IN_PROGRESS, STOPPED] } }] }\n      sort: [{ name: ASC }]\n      limit: 12\n    ) { ...InstanceCardFields }\n    running: instances(\n      where: { AND: [{ deletedInAuraAt: { eq: null } }, { statusGroup: { eq: READY } }] }\n      sort: [{ name: ASC }]\n      limit: 12\n    ) { ...InstanceCardFields }\n  }\n": typeof types.HomeDocument,
@@ -41,7 +46,12 @@ const documents: Documents = {
     "\n  mutation PlanUpdate($instanceId: String!, $changes: InstanceChange!) {\n    planUpdate(instanceId: $instanceId, changes: $changes) { operationId }\n  }\n": types.PlanUpdateDocument,
     "\n  mutation PlanPause($instanceId: String!) { planPause(instanceId: $instanceId) { operationId } }\n": types.PlanPauseDocument,
     "\n  mutation PlanResume($instanceId: String!) { planResume(instanceId: $instanceId) { operationId } }\n": types.PlanResumeDocument,
-    "\n  mutation Confirm($id: ID!) { confirmOperation(operationId: $id) { operationId status } }\n": types.ConfirmDocument,
+    "\n  mutation PlanCreate($input: InstanceCreate!) { planCreate(input: $input) { operationId } }\n": types.PlanCreateDocument,
+    "\n  mutation PlanDelete($instanceId: String!) { planDelete(instanceId: $instanceId) { operationId } }\n": types.PlanDeleteDocument,
+    "\n  mutation Confirm($id: ID!, $typedName: String) { confirmOperation(operationId: $id, typedName: $typedName) { operationId status } }\n": types.ConfirmDocument,
+    "\n  mutation Reveal($instanceId: String!) { revealInstancePassword(instanceId: $instanceId) { username password } }\n": types.RevealDocument,
+    "\n  query CheckInstance($instanceId: String!) { checkInstance(instanceId: $instanceId) { checkedAt inAura differences { field label stored live } } }\n": types.CheckInstanceDocument,
+    "\n  query CreateOptions {\n    tenants(sort: [{ name: ASC }]) {\n      auraId name\n      configurations { cloudProvider region regionName type memory storage version }\n    }\n    tiers { type label }\n  }\n": types.CreateOptionsDocument,
     "\n  mutation Cancel($id: ID!) { cancelOperation(operationId: $id) }\n": types.CancelDocument,
     "\n  fragment InstanceCardFields on Instance {\n    auraId name status statusGroup memory storage region createdAt deletedInAuraAt\n    tenant { auraId name }\n    cloud { name }\n    tier { type label }\n  }\n": types.InstanceCardFieldsFragmentDoc,
     "\n  query Home {\n    total: instancesConnection(where: { deletedInAuraAt: { eq: null } }) { totalCount }\n    tenants(sort: [{ name: ASC }]) { auraId name instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }\n    cloudProviders(sort: [{ name: ASC }]) { name instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }\n    tiers(sort: [{ label: ASC }]) { type label instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }\n    attention: instances(\n      where: { AND: [{ deletedInAuraAt: { eq: null } }, { statusGroup: { in: [FAILED, IN_PROGRESS, STOPPED] } }] }\n      sort: [{ name: ASC }]\n      limit: 12\n    ) { ...InstanceCardFields }\n    running: instances(\n      where: { AND: [{ deletedInAuraAt: { eq: null } }, { statusGroup: { eq: READY } }] }\n      sort: [{ name: ASC }]\n      limit: 12\n    ) { ...InstanceCardFields }\n  }\n": types.HomeDocument,
@@ -99,7 +109,27 @@ export function graphql(source: "\n  mutation PlanResume($instanceId: String!) {
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation Confirm($id: ID!) { confirmOperation(operationId: $id) { operationId status } }\n"): (typeof documents)["\n  mutation Confirm($id: ID!) { confirmOperation(operationId: $id) { operationId status } }\n"];
+export function graphql(source: "\n  mutation PlanCreate($input: InstanceCreate!) { planCreate(input: $input) { operationId } }\n"): (typeof documents)["\n  mutation PlanCreate($input: InstanceCreate!) { planCreate(input: $input) { operationId } }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation PlanDelete($instanceId: String!) { planDelete(instanceId: $instanceId) { operationId } }\n"): (typeof documents)["\n  mutation PlanDelete($instanceId: String!) { planDelete(instanceId: $instanceId) { operationId } }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation Confirm($id: ID!, $typedName: String) { confirmOperation(operationId: $id, typedName: $typedName) { operationId status } }\n"): (typeof documents)["\n  mutation Confirm($id: ID!, $typedName: String) { confirmOperation(operationId: $id, typedName: $typedName) { operationId status } }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation Reveal($instanceId: String!) { revealInstancePassword(instanceId: $instanceId) { username password } }\n"): (typeof documents)["\n  mutation Reveal($instanceId: String!) { revealInstancePassword(instanceId: $instanceId) { username password } }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query CheckInstance($instanceId: String!) { checkInstance(instanceId: $instanceId) { checkedAt inAura differences { field label stored live } } }\n"): (typeof documents)["\n  query CheckInstance($instanceId: String!) { checkInstance(instanceId: $instanceId) { checkedAt inAura differences { field label stored live } } }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query CreateOptions {\n    tenants(sort: [{ name: ASC }]) {\n      auraId name\n      configurations { cloudProvider region regionName type memory storage version }\n    }\n    tiers { type label }\n  }\n"): (typeof documents)["\n  query CreateOptions {\n    tenants(sort: [{ name: ASC }]) {\n      auraId name\n      configurations { cloudProvider region regionName type memory storage version }\n    }\n    tiers { type label }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

@@ -2,15 +2,17 @@
 // Neo4j Sweden AB [http://neo4j.com]
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { useMutation, useQuery } from "urql";
-import { DetailQuery, PlanPauseMutation, PlanResumeMutation } from "../graphql/documents";
+import { useClient, useMutation, useQuery } from "urql";
+import { CheckInstanceQuery, DetailQuery, PlanDeleteMutation, PlanPauseMutation, PlanResumeMutation } from "../graphql/documents";
 import { errorMessage, useApp, useNow, useRefreshOnSync, useTitle } from "../hooks";
 import { cloudLabel, formatDate, memoryAndStorage, plural, relativeTime } from "../lib/format";
 import { kindLabel, operationView } from "../lib/operations";
 import { actionsLocked } from "../lib/status";
 import { matchesOperationFilter } from "../lib/operations";
+import { PasswordField } from "../ui/PasswordField";
 import { Banner, Button, CopyButton, EmptyState, Skeleton, StatusChip, TagLink } from "../ui";
 import { initials } from "../lib/format";
+import { Icon } from "../ui/Icon";
 import { posterStyle } from "../lib/poster";
 
 function Row({ k, children, mono }: { k: string; children: React.ReactNode; mono?: boolean }) {
@@ -25,7 +27,7 @@ function Row({ k, children, mono }: { k: string; children: React.ReactNode; mono
 /** One instance, read from the stored copy, with the changes that can be planned on it. */
 export function Detail() {
   const { id = "" } = useParams();
-  const { setup } = useApp();
+  const { setup, syncNow } = useApp();
   const now = useNow();
   const [{ data, fetching }, refetch] = useQuery({ query: DetailQuery, variables: { id } });
   useRefreshOnSync(() => refetch({ requestPolicy: "network-only" }), setup.lastSyncAt);
@@ -34,12 +36,22 @@ export function Detail() {
   const navigate = useNavigate();
   const [, planPause] = useMutation(PlanPauseMutation);
   const [, planResume] = useMutation(PlanResumeMutation);
+  const [, planDelete] = useMutation(PlanDeleteMutation);
+  const client = useClient();
+  const [check, setCheck] = useState<{ state: "idle" | "checking" | "error" | "done"; checkedAt?: string; inAura?: boolean; differences?: { field: string; label: string; stored: string; live: string }[]; error?: string }>({ state: "idle" });
+  /** Asks Aura now and compares, without changing the stored copy. */
+  const runCheck = async () => {
+    setCheck({ state: "checking" });
+    const r = await client.query(CheckInstanceQuery, { instanceId: id }, { requestPolicy: "network-only" }).toPromise();
+    if (r.error || !r.data) return setCheck({ state: "error", error: errorMessage(r.error) ?? "Could not check with Aura." });
+    setCheck({ state: "done", ...r.data.checkInstance });
+  };
   const [planError, setPlanError] = useState<string>();
   /** Pause and resume are planned like any change: the review page comes next, and nothing is sent until it is confirmed. */
-  const plan = async (kind: "PAUSE" | "RESUME") => {
+  const plan = async (kind: "PAUSE" | "RESUME" | "DELETE") => {
     setPlanError(undefined);
-    const r = kind === "PAUSE" ? await planPause({ instanceId: id }) : await planResume({ instanceId: id });
-    const operationId = r.data && ("planPause" in r.data ? r.data.planPause.operationId : r.data.planResume.operationId);
+    const r = kind === "PAUSE" ? await planPause({ instanceId: id }) : kind === "RESUME" ? await planResume({ instanceId: id }) : await planDelete({ instanceId: id });
+    const operationId = r.data && ("planPause" in r.data ? r.data.planPause.operationId : "planResume" in r.data ? r.data.planResume.operationId : r.data.planDelete.operationId);
     if (operationId) navigate(`/operations/${encodeURIComponent(operationId)}`);
     else setPlanError(errorMessage(r.error) ?? `Could not plan the ${kind.toLowerCase()}.`);
   };
@@ -101,6 +113,7 @@ export function Detail() {
           {locked ? <span className="btn btn-secondary" aria-disabled="true">Edit</span> : <Link to={`/instances/${encodeURIComponent(instance.auraId)}/edit`} className="btn btn-secondary">Edit</Link>}
           {canPause && <Button variant="secondary" disabled={locked} onClick={() => void plan("PAUSE")}>Pause</Button>}
           {canResume && <Button variant="secondary" disabled={locked} onClick={() => void plan("RESUME")}>Resume</Button>}
+          <Button variant="danger" disabled={locked} onClick={() => void plan("DELETE")}>Delete</Button>
         </div>
       )}
       {planError && <Banner tone="danger">{planError}</Banner>}
@@ -125,11 +138,8 @@ export function Detail() {
                     <CopyButton text={instance.credentialUsername} label="username" />
                   </div>
                 )}
-                <div className="prow stack">
-                  <span className="k">Password</span>
-                  <span className="v">Stored encrypted{instance.passwordRevealCount > 0 ? ` · shown ${plural(instance.passwordRevealCount, "time")}` : ""}</span>
-                </div>
-                <p className="note">The password Aura gave when this instance was created. Showing it is not available yet.</p>
+                <PasswordField instanceId={instance.auraId} onShown={() => refetch({ requestPolicy: "network-only" })} />
+                <p className="note">The password Aura gave when this instance was created, stored encrypted{instance.passwordRevealCount > 0 ? ` and shown ${plural(instance.passwordRevealCount, "time")}` : ""}.</p>
               </>
             ) : (
               <>
@@ -158,7 +168,26 @@ export function Detail() {
             {instance.graphRelationships && <Row k="Relationships">{instance.graphRelationships}</Row>}
             <Row k="Instance id" mono>{instance.auraId}</Row>
           </section>
-          <p className="muted" style={{ fontSize: 13 }}>Stored copy read from Aura {relativeTime(instance.syncedAt, now) || "at an unknown time"}.</p>
+          <section className="panel" aria-labelledby="check-title">
+            <h2 id="check-title">Stored copy</h2>
+            <div className="prow stack">
+              <span className="v">Read from Aura {relativeTime(instance.syncedAt, now) || "at an unknown time"}.</span>
+            </div>
+            {check.state === "done" && check.inAura && check.differences!.length === 0 && <p className="note" role="status">Matches Aura as of just now.</p>}
+            {check.state === "done" && !check.inAura && <p className="note" role="status">Aura no longer has this instance. Sync to record that.</p>}
+            {check.state === "done" && check.differences!.map((d) => (
+              <div className="diffrow" key={d.field}>
+                <span className="k">{d.label}</span>
+                <span className="v"><span className="before">{d.stored}</span><Icon name="arrow" size={16} aria-label="Aura says" /><span className="after">{d.live}</span></span>
+              </div>
+            ))}
+            {check.state === "done" && check.differences!.length > 0 && <p className="note" role="status">Aura shows these differences. Sync to bring the stored copy up to date.</p>}
+            {check.state === "error" && <p className="note" role="alert">{check.error}</p>}
+            <div className="panelactions">
+              <Button variant="secondary" onClick={() => void runCheck()} disabled={check.state === "checking" || removed}>{check.state === "checking" ? "Checking…" : "Check with Aura"}</Button>
+              {check.state === "done" && (check.differences!.length > 0 || !check.inAura) && <Button variant="secondary" onClick={() => void syncNow()}>Sync now</Button>}
+            </div>
+          </section>
         </div>
 
         <section className="panel" aria-labelledby="ops-title">

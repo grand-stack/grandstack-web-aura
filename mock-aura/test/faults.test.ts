@@ -76,4 +76,12 @@ describe("the admin endpoint", () => {
   it("is not part of the Aura API: other methods are unknown", async () => {
     expect((await fetch(`${h.base}/__faults`, { method: "GET" })).status).toBe(404);
   });
+  it("shows the password of a created instance, for tests to compare with, and 404s for any other", async () => {
+    const created = await h.call("POST", "/instances", { body: { version: "5", region: "europe-west1", memory: "4GB", storage: "8GB", name: "pw-check", type: "professional-db", tenant_id: "a3b1c2d4-0001-4aaa-9bbb-000000000001", cloud_provider: "gcp" } });
+    expect(created.status).toBe(202);
+    const body = created.json as { data: { id: string; password: string } };
+    const shown = await fetch(`${h.base}/__passwords/${body.data.id}`);
+    expect(await shown.json()).toEqual({ password: body.data.password });
+    expect((await fetch(`${h.base}/__passwords/a1b2c3d4`)).status).toBe(404);
+  });
 });

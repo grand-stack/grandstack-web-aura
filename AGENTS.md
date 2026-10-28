@@ -57,3 +57,9 @@ Before you finish a change: `npm run typecheck && npm test`, and the integration
 - **The stale check compares fields, not `syncedAt`.** A sync that changed nothing must not invalidate a plan; a changed name, size or switch must.
 - **A page that reads a second query waits for it in the e2e run.** The size options arrive after the form shows. Use `waitFor` before checking or clicking what depends on them.
 - **mock-aura faults are for tests only** (`POST /__faults`, `DELETE /__faults`). `reset()` clears them. Clear them after a run that sets one.
+- **Aura shows an instance password once, so store it before anything else can fail.** `sendCreate` seals and saves it the moment the create answer arrives, then records the instance, then marks steps. Do not reorder these.
+- **`revealInstancePassword` is the only way a password leaves the store, and it records before it returns.** `RevealedPassword` may be returned by no other field. The supergraph test checks this. Never log a revealed password, never put one in an operation, and keep it out of web storage and URLs.
+- **A delete is finished by a 404, not by "destroying".** Waiting for the status would mark it done while Aura still lists the instance. Confirming a delete checks the typed name on the server.
+- **A create is never sent twice.** It is not retried after a 5xx or lost answer, and recovery fails a possibly-sent create instead of asking again.
+- **The phone top bar has room for four icons, not five.** A fifth made the page scroll sideways and made taps miss their targets on a touch viewport only. Put new actions in the page and run the e2e on the phone viewport.
+- **mock-aura test controls**: `GET /__passwords/:id` shows the password of a created instance, so a test can compare it with what the app shows.

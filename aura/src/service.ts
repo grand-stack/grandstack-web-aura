@@ -1,9 +1,10 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
-import { AuraAuthError, AuraClient } from "./client.js";
+import { AuraApiError, AuraAuthError, AuraClient } from "./client.js";
 import { UserError } from "./errors.js";
 import type { SecretStore } from "./secrets.js";
 import { OperationService } from "./operations/service.js";
+import { loadInstance } from "./operations/store.js";
 import { maskClientId } from "./status.js";
 import type { StoreClient } from "./storeClient.js";
 import { startSync, type SyncResult } from "./sync.js";
@@ -53,6 +54,11 @@ export class AuraService {
     this.operations = new OperationService({
       store: o.store,
       client: () => this.auraClient(),
+      vault: {
+        save: (id, username, password) => o.secrets.saveInstanceCredential(id, username, password),
+        link: (id) => o.secrets.linkInstanceCredential(id),
+        delete: (id) => o.secrets.deleteInstanceCredential(id),
+      },
       isConnected: () => o.secrets.hasAuraSecret(o.accountId),
       now: o.now,
       sleep: o.sleep,
@@ -151,6 +157,48 @@ export class AuraService {
   async syncNow(): Promise<{ started: boolean; runId: string }> {
     if (!(await this.o.secrets.hasAuraSecret(this.o.accountId))) throw new UserError("Connect an Aura account first.");
     return this.startOnce();
+  }
+
+  /**
+   * Shows an instance's stored password, once per call, and records that it was shown. The only place a password leaves the store.
+   * `by` is who asked; there is no sign-in yet, so it says so.
+   */
+  async revealPassword(instanceId: string, by = "local"): Promise<{ username: string; password: string }> {
+    const revealed = await this.o.secrets.revealInstanceCredential(instanceId, by, this.now().toISOString());
+    if (!revealed) throw new UserError("No password is stored for this instance. Aura shows it only when an instance is created, so an instance found by a sync has none.");
+    return revealed;
+  }
+
+  /**
+   * Compares an instance as stored with Aura as it is now, without changing the stored copy. The person decides whether to sync.
+   */
+  async checkInstance(instanceId: string): Promise<{ checkedAt: string; inAura: boolean; differences: { field: string; label: string; stored: string; live: string }[] }> {
+    if (!(await this.o.secrets.hasAuraSecret(this.o.accountId))) throw new UserError("Connect an Aura account first.");
+    const stored = await loadInstance(this.o.store, instanceId);
+    if (!stored) throw new UserError("That instance is not in the store. Sync, then try again.");
+    const checkedAt = this.now().toISOString();
+    let live;
+    try {
+      live = await this.auraClient().getInstance(instanceId);
+    } catch (err) {
+      if (err instanceof AuraApiError && err.status === 404) return { checkedAt, inAura: false, differences: [] };
+      throw err instanceof AuraAuthError ? new UserError("Aura rejected the stored client id and secret. Replace the credentials.") : new UserError("Could not read the instance from Aura. Try again in a moment.");
+    }
+    const show = (v: unknown) => (v === null || v === undefined ? "Unknown" : typeof v === "boolean" ? (v ? "On" : "Off") : String(v));
+    const pairs: [string, string, unknown, unknown][] = [
+      ["name", "Name", stored.name, live.name],
+      ["status", "Status", stored.status, live.status],
+      ["memory", "Memory", stored.memory, live.memory],
+      ["storage", "Storage", stored.storage, live.storage],
+      ["vectorOptimized", "Vector optimized", stored.vectorOptimized, live.vector_optimized],
+      ["graphAnalyticsPlugin", "Graph analytics plugin", stored.graphAnalyticsPlugin, live.graph_analytics_plugin],
+    ];
+    return {
+      checkedAt,
+      inAura: true,
+      // A value Aura does not report is not a difference
+      differences: pairs.filter(([, , a, b]) => b !== undefined && b !== null && (a ?? null) !== b).map(([field, label, a, b]) => ({ field, label, stored: show(a), live: show(b) })),
+    };
   }
 
   private async startOnce(): Promise<{ started: boolean; runId: string }> {

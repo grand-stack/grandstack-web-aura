@@ -38,8 +38,38 @@ export const PlanResumeMutation = graphql(`
   mutation PlanResume($instanceId: String!) { planResume(instanceId: $instanceId) { operationId } }
 `);
 
+export const PlanCreateMutation = graphql(`
+  mutation PlanCreate($input: InstanceCreate!) { planCreate(input: $input) { operationId } }
+`);
+
+export const PlanDeleteMutation = graphql(`
+  mutation PlanDelete($instanceId: String!) { planDelete(instanceId: $instanceId) { operationId } }
+`);
+
+// typedName is only for a delete: the instance's name, typed by the person. The server checks it.
 export const ConfirmMutation = graphql(`
-  mutation Confirm($id: ID!) { confirmOperation(operationId: $id) { operationId status } }
+  mutation Confirm($id: ID!, $typedName: String) { confirmOperation(operationId: $id, typedName: $typedName) { operationId status } }
+`);
+
+// The only query or mutation that returns a password. Called when the eye is clicked, never on load.
+export const RevealMutation = graphql(`
+  mutation Reveal($instanceId: String!) { revealInstancePassword(instanceId: $instanceId) { username password } }
+`);
+
+// Aura asked now, stored copy untouched
+export const CheckInstanceQuery = graphql(`
+  query CheckInstance($instanceId: String!) { checkInstance(instanceId: $instanceId) { checkedAt inAura differences { field label stored live } } }
+`);
+
+// Everything a tenant can create, for the create form's steps
+export const CreateOptionsQuery = graphql(`
+  query CreateOptions {
+    tenants(sort: [{ name: ASC }]) {
+      auraId name
+      configurations { cloudProvider region regionName type memory storage version }
+    }
+    tiers { type label }
+  }
 `);
 
 export const CancelMutation = graphql(`

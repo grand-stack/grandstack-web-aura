@@ -271,3 +271,9 @@ fieldset.formpanel { min-width: 0; margin: 0; }
 .step .title { font-size: 14px; font-weight: 600; }
 .step-pending .title { color: var(--mu); font-weight: 500; }
 .step .sub { font-size: 12px; color: var(--mu); overflow-wrap: anywhere; }
+.panelactions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px; }
+.copyrow .revealed { overflow-wrap: anywhere; user-select: all; }
+.newbtn { text-decoration: none; display: none; }
+@media (min-width: 640px) { .newbtn { display: inline-flex; } }
+.btn-danger:not(:disabled):hover { background: var(--dbg); }
+.actionbar .btn:last-child:not(:only-child) { flex-grow: 2; }

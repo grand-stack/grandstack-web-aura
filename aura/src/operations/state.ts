@@ -4,8 +4,27 @@
 /** Where an operation is in plan, review, confirm, progress. The same values as the store's OperationStatus. */
 export type OperationStatus = "PLANNED" | "CONFIRMED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 
-/** What this version can plan. The store also knows CREATE and DELETE, which come later. */
+/** The changes to an existing instance that are not creating or deleting it. */
 export type PlannableKind = "UPDATE" | "PAUSE" | "RESUME";
+
+/** Everything an operation can do. The same values as the store's OperationKind. */
+export type OperationKind = PlannableKind | "CREATE" | "DELETE";
+
+/** What a create asks Aura for, once checked against the options the tenant is offered. */
+export interface CreateRequest {
+  tenantId: string;
+  tenantName: string;
+  cloudProvider: string;
+  region: string;
+  regionName: string;
+  type: string;
+  version: string;
+  memory: string;
+  storage: string;
+  name: string;
+  vectorOptimized: boolean;
+  graphAnalyticsPlugin: boolean;
+}
 
 const MOVES: Record<OperationStatus, OperationStatus[]> = {
   PLANNED: ["CONFIRMED", "CANCELLED"],

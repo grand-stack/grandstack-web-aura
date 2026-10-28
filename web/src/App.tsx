@@ -8,6 +8,7 @@ import { AppContext, errorMessage, useApp, useNow, usePoll } from "./hooks";
 import { relativeTime } from "./lib/format";
 import { applyTheme, loadTheme, nextTheme, saveTheme, type Theme } from "./lib/theme";
 import { Account } from "./pages/Account";
+import { Create } from "./pages/Create";
 import { Detail } from "./pages/Detail";
 import { Edit } from "./pages/Edit";
 import { Home } from "./pages/Home";
@@ -55,6 +56,7 @@ function TopBar({ connected }: { connected: boolean }) {
         </nav>
       )}
       <div className="topright">
+        {connected && <Link to="/instances/new" className="iconbtn newbtn" aria-label="New instance" title="New instance"><Icon name="plus" /></Link>}
         {connected && setup.lastSyncAt && <span className="synced">Synced {relativeTime(setup.lastSyncAt, now)}</span>}
         {connected && (
           <button type="button" className={`iconbtn${syncing ? " spin" : ""}`} onClick={() => void syncNow()} disabled={syncing} aria-label={syncing ? "Syncing with Aura" : "Sync with Aura now"} title="Sync with Aura now">
@@ -120,6 +122,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/instances" element={<Results />} />
+          <Route path="/instances/new" element={<Create />} />
           <Route path="/instances/:id" element={<Detail />} />
           <Route path="/instances/:id/edit" element={<Edit />} />
           <Route path="/operations" element={<Operations />} />

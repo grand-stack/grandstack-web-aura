@@ -2,7 +2,7 @@
 // Neo4j Sweden AB [http://neo4j.com]
 import { UserError } from "../errors.js";
 import { describe, type Changes, type Plan } from "./diff.js";
-import type { PlannableKind } from "./state.js";
+import type { CreateRequest, PlannableKind } from "./state.js";
 import { type StoredInstance } from "./store.js";
 
 const MAX_NAME = 30;
@@ -75,4 +75,64 @@ export function normaliseChanges(instance: StoredInstance, input: ChangeInput, s
 
 export function buildPlan(kind: PlannableKind, instance: StoredInstance, changes: Changes): Plan {
   return describe(kind, instance, changes);
+}
+
+/** Deleting is allowed for any instance Aura is not already working on, running, paused or failed. */
+export function guardDelete(instance: StoredInstance): void {
+  if (instance.deletedInAuraAt !== null) throw new UserError("This instance is no longer in Aura.");
+}
+
+export interface CreateInput {
+  tenantId: string;
+  cloudProvider: string;
+  region: string;
+  type: string;
+  memory: string;
+  storage?: string | null;
+  name: string;
+  vectorOptimized?: boolean | null;
+  graphAnalyticsPlugin?: boolean | null;
+}
+
+/** One option the tenant is offered, as stored. */
+export interface OfferedConfiguration {
+  cloudProvider: string;
+  region: string;
+  regionName: string;
+  type: string;
+  memory: string;
+  storage: string;
+  version: string;
+}
+
+/**
+ * Checks a create against what the tenant is offered, and fills in what the person did not choose (the storage that goes with the
+ * memory, the version, the region's name). Anything that is not an offered combination is refused, so a request Aura would reject
+ * is never built. Throws a UserError that says what to fix.
+ */
+export function normaliseCreate(input: CreateInput, tenantName: string, offered: OfferedConfiguration[]): CreateRequest {
+  const name = input.name.trim();
+  if (name.length === 0) throw new UserError("The name cannot be empty.");
+  if (name.length > MAX_NAME) throw new UserError(`The name can be at most ${MAX_NAME} characters.`);
+
+  const match = offered.find(
+    (c) =>
+      c.cloudProvider === input.cloudProvider && c.region === input.region && c.type === input.type && c.memory === input.memory &&
+      (input.storage === undefined || input.storage === null || c.storage === input.storage),
+  );
+  if (!match) throw new UserError("That combination of cloud, region, tier and size is not offered for this tenant.");
+  return {
+    tenantId: input.tenantId,
+    tenantName,
+    cloudProvider: match.cloudProvider,
+    region: match.region,
+    regionName: match.regionName,
+    type: match.type,
+    version: match.version,
+    memory: match.memory,
+    storage: match.storage,
+    name,
+    vectorOptimized: input.vectorOptimized === true,
+    graphAnalyticsPlugin: input.graphAnalyticsPlugin === true,
+  };
 }

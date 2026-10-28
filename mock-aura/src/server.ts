@@ -211,13 +211,21 @@ export function createMockAura(options: MockAuraOptions = {}): MockAura {
       return { status: 200, body: { faults: state.faults } };
     }
 
+    // The password Aura showed once, for a test to compare with what the app shows. Not part of the Aura API.
+    if (method === "GET" && path.startsWith("/__passwords/")) {
+      const password = state.passwords.get(decodeURIComponent(path.slice("/__passwords/".length)));
+      if (password === undefined) throw middlewareError(404, "Not found");
+      return { status: 200, body: { password } };
+    }
+
     if (!path.startsWith("/v1/")) throw middlewareError(404, "Not found");
     authenticate(req);
     const parts = path.slice("/v1/".length).split("/").filter(Boolean);
     const [resource, id, action] = parts;
 
     // A change can be refused outright, or done but with the answer lost (the connection is cut)
-    const isChange = resource === "instances" && (method === "POST" || method === "PATCH" || method === "DELETE") && id !== undefined && id !== "sizing";
+    // (a create is POST /instances; POST /instances/sizing only asks a question)
+    const isChange = resource === "instances" && (method === "POST" || method === "PATCH" || method === "DELETE") && id !== "sizing";
     if (isChange && state.faults.rejectNext) {
       const { status, message, reason } = state.faults.rejectNext;
       state.faults.rejectNext = undefined;

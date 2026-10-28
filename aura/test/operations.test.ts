@@ -3,8 +3,8 @@
 import { describe, expect, it } from "vitest";
 import { AuraApiError, AuraAuthError, AuraUnreachableError, type InstanceDetail } from "../src/client.js";
 import { UserError } from "../src/errors.js";
-import { describe as describeChange, sameSnapshot, showsChanges, spaced, type Snapshot } from "../src/operations/diff.js";
-import { guardInstance, guardKind, normaliseChanges } from "../src/operations/plan.js";
+import { describe as describeChange, describeCreate, describeDelete, sameSnapshot, showsChanges, spaced, type Snapshot } from "../src/operations/diff.js";
+import { guardInstance, guardKind, normaliseChanges, normaliseCreate } from "../src/operations/plan.js";
 import { defaultPollDelay, expectation, explainFailure, spokenDuration, toAuraBody } from "../src/operations/run.js";
 import { HOLDS_INSTANCE, STEPS, canMove, isFinished, type OperationStatus } from "../src/operations/state.js";
 import type { StoredInstance } from "../src/operations/store.js";
@@ -257,5 +257,54 @@ describe("how often Aura is asked", () => {
     for (let i = 1; i < delays.length; i++) expect(delays[i]!).toBeGreaterThanOrEqual(delays[i - 1]!);
     expect(delays.at(-1)).toBe(15_000);
     expect(Math.max(...delays)).toBe(15_000);
+  });
+});
+
+describe("describeCreate and normaliseCreate", () => {
+  const offered = [
+    { cloudProvider: "gcp", region: "europe-west1", regionName: "Belgium (europe-west1)", type: "professional-db", memory: "4GB", storage: "8GB", version: "5" },
+    { cloudProvider: "gcp", region: "europe-west1", regionName: "Belgium (europe-west1)", type: "professional-db", memory: "8GB", storage: "16GB", version: "5" },
+    { cloudProvider: "aws", region: "eu-west-1", regionName: "Ireland (eu-west-1)", type: "enterprise-db", memory: "16GB", storage: "32GB", version: "2026" },
+  ];
+  const input = { tenantId: "t1", cloudProvider: "gcp", region: "europe-west1", type: "professional-db", memory: "8GB", name: "  orders  " };
+
+  it("trims the name and fills in storage, version and the region's name from the offered combination", () => {
+    expect(normaliseCreate(input, "Acme", offered)).toEqual({
+      tenantId: "t1", tenantName: "Acme", cloudProvider: "gcp", region: "europe-west1", regionName: "Belgium (europe-west1)", type: "professional-db",
+      version: "5", memory: "8GB", storage: "16GB", name: "orders", vectorOptimized: false, graphAnalyticsPlugin: false,
+    });
+  });
+  it("accepts storage that matches and refuses storage that does not go with the memory", () => {
+    expect(normaliseCreate({ ...input, storage: "16GB" }, "Acme", offered).storage).toBe("16GB");
+    expect(() => normaliseCreate({ ...input, storage: "8GB" }, "Acme", offered)).toThrow(/not offered/);
+  });
+  it.each([
+    ["another cloud", { cloudProvider: "azure" }],
+    ["another region", { region: "us-east-1" }],
+    ["another tier", { type: "business-critical" }],
+    ["another size", { memory: "2GB" }],
+  ])("refuses %s", (_, over) => {
+    expect(() => normaliseCreate({ ...input, ...over }, "Acme", offered)).toThrow(/not offered/);
+  });
+  it("refuses an empty, blank or long name, and accepts exactly 30 characters", () => {
+    expect(() => normaliseCreate({ ...input, name: "" }, "Acme", offered)).toThrow(/cannot be empty/);
+    expect(() => normaliseCreate({ ...input, name: "   " }, "Acme", offered)).toThrow(/cannot be empty/);
+    expect(() => normaliseCreate({ ...input, name: "x".repeat(31) }, "Acme", offered)).toThrow(/at most 30/);
+    expect(normaliseCreate({ ...input, name: "x".repeat(30) }, "Acme", offered).name).toHaveLength(30);
+  });
+  it("turns the switches on only when asked", () => {
+    expect(normaliseCreate({ ...input, vectorOptimized: true, graphAnalyticsPlugin: null }, "Acme", offered)).toMatchObject({ vectorOptimized: true, graphAnalyticsPlugin: false });
+  });
+  it("describes a create with an empty before, and lists the switches only when on", () => {
+    const plain = describeCreate(normaliseCreate(input, "Acme", offered));
+    expect(plain.items.map((i) => [i.label, i.before, i.after])).toEqual([
+      ["Name", "", "orders"], ["Tenant", "", "Acme"], ["Cloud", "", "GCP"], ["Region", "", "Belgium (europe-west1)"], ["Tier", "", "AuraDB Professional"], ["Memory", "", "8 GB"], ["Storage", "", "16 GB"],
+    ]);
+    expect(describeCreate(normaliseCreate({ ...input, graphAnalyticsPlugin: true }, "Acme", offered)).items.at(-1)).toMatchObject({ label: "Graph analytics plugin", after: "On" });
+  });
+  it("describes a delete as irreversible", () => {
+    const plan = describeDelete({ name: "orders-prod", status: "running", memory: "8GB", storage: "16GB", vectorOptimized: false, graphAnalyticsPlugin: false });
+    expect(plan.items).toEqual([{ field: "state", label: "Instance", before: "orders-prod", after: "Deleted" }]);
+    expect(plan.warnings[0]).toMatch(/cannot be undone/);
   });
 });

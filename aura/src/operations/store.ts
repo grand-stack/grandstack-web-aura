@@ -2,7 +2,10 @@
 // Neo4j Sweden AB [http://neo4j.com]
 import type { StoreClient } from "../storeClient.js";
 import type { Changes, Plan, Snapshot } from "./diff.js";
-import { HOLDS_INSTANCE, canMove, type OperationStatus, type PlannableKind } from "./state.js";
+import { statusGroup, tierLabel } from "../status.js";
+import type { CreatedInstance } from "../client.js";
+import { HOLDS_INSTANCE, canMove, type CreateRequest, type OperationKind, type OperationStatus } from "./state.js";
+import type { OfferedConfiguration } from "./plan.js";
 
 /** The stored copy of an instance, with what planning needs to know about where it lives. */
 export interface StoredInstance extends Snapshot {
@@ -27,7 +30,7 @@ export interface StoredOperation {
   id: string;
   kind: string;
   status: OperationStatus;
-  desired: { kind: PlannableKind; changes?: Changes };
+  desired: { kind: OperationKind; changes?: Changes; create?: CreateRequest };
   before: Snapshot;
   plan: Plan;
   basedOnSyncedAt: string | null;
@@ -85,7 +88,7 @@ export async function holdingOperations(store: StoreClient, auraId: string): Pro
 
 export async function createOperation(
   store: StoreClient,
-  input: { kind: PlannableKind; instance: StoredInstance; desired: object; before: Snapshot; plan: Plan; requestedBy: string; at: string },
+  input: { kind: OperationKind; instance?: StoredInstance; desired: object; before?: Snapshot; plan: Plan; requestedBy: string; at: string },
 ): Promise<string> {
   const data = await store.request<{ createOperations: { operations: { id: string }[] } }>(
     `mutation($input: [OperationCreateInput!]!) { createOperations(input: $input) { operations { id } } }`,
@@ -94,13 +97,14 @@ export async function createOperation(
         kind: input.kind,
         status: "PLANNED",
         desired: JSON.stringify(input.desired),
-        before: JSON.stringify(input.before),
+        before: JSON.stringify(input.before ?? {}),
         diff: JSON.stringify(input.plan),
-        basedOnSyncedAt: input.instance.syncedAt,
+        basedOnSyncedAt: input.instance?.syncedAt ?? null,
         requestedBy: input.requestedBy,
         createdAt: input.at,
         updatedAt: input.at,
-        target: { connect: [{ where: { node: { auraId: { eq: input.instance.auraId } } } }] },
+        // A create has no instance yet. It is linked once Aura has made one.
+        ...(input.instance ? { target: { connect: [{ where: { node: { auraId: { eq: input.instance.auraId } } } }] } } : {}),
       }],
     },
   );
@@ -161,4 +165,69 @@ export async function setStep(store: StoreClient, id: string, seq: number, statu
 export async function unfinishedOperations(store: StoreClient): Promise<{ id: string }[]> {
   const data = await store.request<{ operations: { id: string }[] }>(`query($statuses: [OperationStatus!]!) { operations(where: { status: { in: $statuses } }) { id } }`, { statuses: HOLDS_INSTANCE });
   return data.operations;
+}
+
+/** The tenant's name, or null when the store has no such tenant. */
+export async function loadTenantName(store: StoreClient, tenantId: string): Promise<string | null> {
+  const data = await store.request<{ tenants: { name: string }[] }>(`query($id: String!) { tenants(where: { auraId: { eq: $id } }) { name } }`, { id: tenantId });
+  return data.tenants[0]?.name ?? null;
+}
+
+/** Every combination of cloud, region, tier and size the tenant is offered, as stored. */
+export async function loadOffered(store: StoreClient, tenantId: string): Promise<OfferedConfiguration[]> {
+  const data = await store.request<{ instanceConfigurations: OfferedConfiguration[] }>(
+    `query($tenant: String!) { instanceConfigurations(where: { tenant: { some: { auraId: { eq: $tenant } } } }) { cloudProvider region regionName type memory storage version } }`,
+    { tenant: tenantId },
+  );
+  return data.instanceConfigurations;
+}
+
+/** Makes sure the cloud and tier tags an instance hangs off exist: a tenant may be offered a cloud none of its instances use yet. */
+async function ensureTags(store: StoreClient, cloud: string, type: string): Promise<void> {
+  const tags = await store.request<{ cloudProviders: { name: string }[]; tiers: { type: string }[] }>(`{ cloudProviders { name } tiers { type } }`);
+  if (!tags.cloudProviders.some((c) => c.name === cloud)) {
+    await store.request(`mutation($input: [CloudProviderCreateInput!]!) { createCloudProviders(input: $input) { info { nodesCreated } } }`, { input: [{ name: cloud }] });
+  }
+  if (!tags.tiers.some((t) => t.type === type)) {
+    await store.request(`mutation($input: [TierCreateInput!]!) { createTiers(input: $input) { info { nodesCreated } } }`, { input: [{ type, label: tierLabel(type) }] });
+  }
+}
+
+/** Records an instance Aura has just accepted, in the "creating" status, with its tenant, cloud and tier, and links the operation to it. */
+export async function recordCreatedInstance(store: StoreClient, operationId: string, created: CreatedInstance, r: CreateRequest, at: string): Promise<void> {
+  await ensureTags(store, r.cloudProvider, r.type);
+  await store.request(`mutation($input: [InstanceCreateInput!]!) { createInstances(input: $input) { info { nodesCreated } } }`, {
+    input: [{
+      auraId: created.id,
+      name: r.name,
+      status: "creating",
+      statusGroup: statusGroup("creating"),
+      connectionUrl: created.connection_url,
+      region: r.region,
+      memory: r.memory,
+      storage: r.storage,
+      version: r.version,
+      vectorOptimized: r.vectorOptimized,
+      graphAnalyticsPlugin: r.graphAnalyticsPlugin,
+      createdAt: at,
+      syncedAt: at,
+      tenant: { connect: [{ where: { node: { auraId: { eq: r.tenantId } } } }] },
+      cloud: { connect: [{ where: { node: { name: { eq: r.cloudProvider } } } }] },
+      tier: { connect: [{ where: { node: { type: { eq: r.type } } } }] },
+    }],
+  });
+  await store.request(`mutation($w: OperationWhere, $u: OperationUpdateInput) { updateOperations(where: $w, update: $u) { operations { id } } }`, {
+    w: { id: { eq: operationId } },
+    u: { target: [{ connect: [{ where: { node: { auraId: { eq: created.id } } } }] }] },
+  });
+}
+
+/** Marks an instance as gone from Aura, once. The record stays so the history does. */
+export async function markInstanceDeleted(store: StoreClient, auraId: string, at: string): Promise<void> {
+  // A sync may have noticed first; keep its time. (The store's filters cannot test for null, so look first.)
+  if ((await loadInstance(store, auraId))?.deletedInAuraAt) return;
+  await store.request(`mutation($w: InstanceWhere, $u: InstanceUpdateInput) { updateInstances(where: $w, update: $u) { instances { auraId } } }`, {
+    w: { auraId: { eq: auraId } },
+    u: { deletedInAuraAt: { set: at } },
+  });
 }

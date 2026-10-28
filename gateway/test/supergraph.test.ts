@@ -23,7 +23,7 @@ describe("the composed supergraph", () => {
 
   it("can only be changed through the aura subgraph's mutations, which plan, confirm and cancel", () => {
     // The store's public subgraph is read-only, so none of its generated create, update or delete mutations can appear
-    expect(names("Mutation").sort()).toEqual(["cancelOperation", "confirmOperation", "connectAura", "disconnectAura", "planPause", "planResume", "planUpdate", "syncNow"]);
+    expect(names("Mutation").sort()).toEqual(["cancelOperation", "confirmOperation", "connectAura", "disconnectAura", "planCreate", "planDelete", "planPause", "planResume", "planUpdate", "revealInstancePassword", "syncNow"]);
   });
 
   it("has no mutation that writes an operation or an instance directly, so a change has to be confirmed to reach Aura", () => {
@@ -31,16 +31,21 @@ describe("the composed supergraph", () => {
   });
 
   it("makes every plan return only an id to review, not a way to skip the review", () => {
-    for (const plan of ["planUpdate", "planPause", "planResume"]) {
+    for (const plan of ["planUpdate", "planPause", "planResume", "planCreate", "planDelete"]) {
       const field = fieldsOf("Mutation").find((f) => f.name.value === plan)!;
       expect(JSON.stringify(field.type)).toContain("PlannedChange");
     }
     expect(names("PlannedChange")).toEqual(["operationId"]);
   });
 
+  it("asks for the instance's name to confirm a delete, as a plain argument of confirmOperation", () => {
+    const confirm = fieldsOf("Mutation").find((f) => f.name.value === "confirmOperation")!;
+    expect((confirm.arguments ?? []).map((a) => a.name.value).sort()).toEqual(["operationId", "typedName"]);
+  });
+
   it("serves the reads the gallery needs from the store, and the setup state from aura", () => {
     expect(names("Query")).toEqual(
-      expect.arrayContaining(["auraSetup", "instances", "instancesConnection", "tenants", "instanceConfigurations", "cloudProviders", "tiers", "operations", "syncRuns", "auraAccounts"]),
+      expect.arrayContaining(["auraSetup", "instances", "instancesConnection", "tenants", "instanceConfigurations", "cloudProviders", "tiers", "operations", "syncRuns", "auraAccounts", "checkInstance"]),
     );
   });
 
@@ -48,13 +53,17 @@ describe("the composed supergraph", () => {
     expect(sdl).toMatch(/type Instance @join__type\(graph: STORE, key: "auraId"\)/);
   });
 
-  it("has no credential type and no field that could return a password, secret or cipher", () => {
+  it("has no credential type and no field that could return a password, secret or cipher, except the reveal", () => {
     expect(sdl).not.toMatch(/InstanceCredential|AuraSecret/);
+    // The one way to see a password: revealInstancePassword, which returns RevealedPassword. Nothing else may carry one.
+    expect(names("RevealedPassword")).toEqual(["username", "password"]);
+    const carriers = [...objectTypes.values()].filter((t) => (t.fields ?? []).some((f) => JSON.stringify(f.type).includes("RevealedPassword"))).map((t) => t.name.value);
+    expect(carriers).toEqual(["Mutation"]);
     const suspicious = [...objectTypes.values()]
       .filter((t) => !t.name.value.startsWith("join__") && !t.name.value.startsWith("link__"))
       .flatMap((t) => (t.fields ?? []).map((f) => `${t.name.value}.${f.name.value}`))
       // hasStoredPassword, its filters and passwordRevealCount are the intended metadata
-      .filter((f) => /password|secret|cipher|nonce/i.test(f) && !/\.(hasStoredPassword|passwordRevealCount)/.test(f));
+      .filter((f) => /password|secret|cipher|nonce/i.test(f) && !/\.(hasStoredPassword|passwordRevealCount|revealInstancePassword)$/.test(f) && !f.startsWith("RevealedPassword."));
     expect(suspicious).toEqual([]);
   });
 

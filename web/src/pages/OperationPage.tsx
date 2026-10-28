@@ -1,5 +1,6 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { useMutation, useQuery } from "urql";
 import { CancelMutation, ConfirmMutation, OperationQuery } from "../graphql/documents";
@@ -24,7 +25,10 @@ export function OperationPage() {
   const plan = parsePlan(op?.diff);
   const target = op?.target[0];
   const verb = op ? operationVerb(op.kind, plan.items) : "";
-  useTitle(op ? `${verb} ${target?.name ?? "instance"}` : "Change");
+  // A create has no instance until Aura has made one: until then it is known by the name that was asked for
+  const subject = target?.name ?? plan.items.find((i) => i.field === "name")?.after ?? "instance";
+  const [typed, setTyped] = useState("");
+  useTitle(op ? `${verb} ${subject}` : "Change");
 
   if (!data && fetching) return <div className="page narrow"><Skeleton className="skeleton-card" /></div>;
   if (!op) {
@@ -41,10 +45,13 @@ export function OperationPage() {
   const error = errorMessage(confirmError) ?? errorMessage(cancelError);
   // A refused confirm because the instance moved on: the way out is a fresh plan
   const stale = !!error && /plan the change again/i.test(error);
+  const isDelete = op.kind === "DELETE";
+  // The server checks the name too. This only keeps the button off until it is typed.
+  const nameTyped = !isDelete || typed === target?.name;
   const finished = op.status === "SUCCEEDED" || op.status === "FAILED" || op.status === "CANCELLED";
 
   const onConfirm = async () => {
-    const r = await confirm({ id: op.id });
+    const r = await confirm({ id: op.id, typedName: isDelete ? typed : null });
     if (!r.error) refetch({ requestPolicy: "network-only" });
   };
   const onCancel = async () => {
@@ -54,9 +61,9 @@ export function OperationPage() {
 
   return (
     <div className="page narrow">
-      <nav className="crumbs" aria-label="Breadcrumb"><Link to="/operations">Changes</Link> / {verb} {target?.name}</nav>
+      <nav className="crumbs" aria-label="Breadcrumb"><Link to="/operations">Changes</Link> / {verb} {subject}</nav>
       <div className="hero">
-        <h1>{verb} {target ? <Link to={back}>{target.name}</Link> : "instance"}</h1>
+        <h1>{verb} {target ? <Link to={back}>{target.name}</Link> : subject}</h1>
         <div className="meta"><StatusChip label={view.label} tone={view.tone} /></div>
       </div>
 
@@ -69,7 +76,7 @@ export function OperationPage() {
           {plan.items.map((item) => (
             <div className="diffrow" key={item.field}>
               <span className="k">{item.label}</span>
-              <span className="v"><span className="before">{item.before}</span><Icon name="arrow" size={16} aria-label="becomes" /><span className="after">{item.after}</span></span>
+              <span className="v">{item.before !== "" && <><span className="before">{item.before}</span><Icon name="arrow" size={16} aria-label="becomes" /></>}<span className="after">{item.after}</span></span>
             </div>
           ))}
         </section>
@@ -98,7 +105,12 @@ export function OperationPage() {
         </section>
       )}
 
-      {op.status === "SUCCEEDED" && <Banner>Done{op.finishedAt ? ` in ${elapsed(op.confirmedAt ?? op.createdAt, op.finishedAt, now)}` : ""}. The stored copy of the instance has been updated.</Banner>}
+      {op.status === "SUCCEEDED" && (
+        <Banner>
+          Done{op.finishedAt ? ` in ${elapsed(op.confirmedAt ?? op.createdAt, op.finishedAt, now)}` : ""}.{" "}
+          {op.kind === "CREATE" ? "The password Aura gave is stored encrypted. Show it from the instance page." : op.kind === "DELETE" ? "Aura no longer has the instance. The record is kept, marked as removed, and its stored password is deleted." : "The stored copy of the instance has been updated."}
+        </Banner>
+      )}
       {op.status === "FAILED" && (
         <>
           <Banner tone="danger">{op.error ?? "This change failed."}</Banner>
@@ -109,10 +121,22 @@ export function OperationPage() {
 
       <p className="muted" style={{ fontSize: 13 }}>Planned {formatDate(op.createdAt)}{op.requestedBy && op.requestedBy !== "local" ? ` by ${op.requestedBy}` : ""}.</p>
 
+      {op.status === "PLANNED" && isDelete && (
+        <section className="panel formpanel" aria-labelledby="typed-title">
+          <h2 id="typed-title">Type the name to delete</h2>
+          <div className="field">
+            <label htmlFor="typed" className="note" style={{ padding: 0 }}>This cannot be undone. Type <strong>{target?.name}</strong> to confirm.</label>
+            <input id="typed" className="input" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoCapitalize="off" spellCheck={false} aria-describedby="typed-hint" />
+            <div id="typed-hint" className="counter">{typed === "" ? "Nothing typed yet" : nameTyped ? "The name matches" : "That is not the name"}</div>
+          </div>
+        </section>
+      )}
       {op.status === "PLANNED" && (
         <div className="actionbar">
           <Button variant="secondary" onClick={onCancel} disabled={confirming || cancelling}>{cancelling ? "Cancelling…" : "Cancel"}</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={confirming || cancelling}>{confirming ? "Confirming…" : "Confirm and apply"}</Button>
+          <Button variant={isDelete ? "danger" : "primary"} onClick={onConfirm} disabled={confirming || cancelling || !nameTyped}>
+            {confirming ? "Confirming…" : isDelete ? "Delete permanently" : "Confirm and apply"}
+          </Button>
         </div>
       )}
       {live && <p className="muted">You can leave this page. The change carries on, and this page picks it up again.</p>}

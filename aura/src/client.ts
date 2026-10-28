@@ -18,6 +18,28 @@ export interface InstanceUpdate {
   graph_analytics_plugin?: boolean;
 }
 
+/** What to send to create an instance. Optional fields are left out when not wanted. */
+export interface InstanceCreate {
+  version: string;
+  region: string;
+  memory: string;
+  name: string;
+  type: string;
+  tenant_id: string;
+  cloud_provider: string;
+  storage?: string;
+  vector_optimized?: boolean;
+  graph_analytics_plugin?: boolean;
+}
+
+/** Aura's answer to a create. The password is shown here once and never again, so it must be stored before anything else is done. */
+export interface CreatedInstance {
+  id: string;
+  connection_url: string;
+  username: string;
+  password: string;
+}
+
 export interface Problem {
   message: string;
   reason?: string;
@@ -234,6 +256,19 @@ export class AuraClient {
   async updateInstance(instanceId: string, changes: InstanceUpdate): Promise<{ status: number; instance?: InstanceDetail }> {
     const { status, body } = await this.requestWithStatus<{ data?: InstanceDetail }>("PATCH", `/instances/${encodeURIComponent(instanceId)}`, changes);
     return { status, instance: body.data };
+  }
+
+  /**
+   * Creates an instance. Aura answers 202 with its id and connection details, including the password, which is returned only now.
+   * Not retried after a server error or a lost connection: an instance may have been made, and a second one costs money.
+   */
+  async createInstance(body: InstanceCreate): Promise<CreatedInstance> {
+    return (await this.request<{ data: CreatedInstance }>("POST", "/instances", body)).data;
+  }
+
+  /** Starts a delete. Aura answers 202 with the instance in the "destroying" status. Irreversible. Not retried after a lost answer. */
+  async deleteInstance(instanceId: string): Promise<void> {
+    await this.request("DELETE", `/instances/${encodeURIComponent(instanceId)}`);
   }
 
   /** Starts a pause. Aura answers 202 with the instance in the "pausing" status. */
