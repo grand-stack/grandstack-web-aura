@@ -12,7 +12,7 @@ Phases 1 to 6 are built and tested. You can create, edit, pause, resume and dele
 | --- | --- | --- |
 | [docs/aura_api_spec_v1-2.yaml](docs/aura_api_spec_v1-2.yaml) | The real Aura API v1 OpenAPI file | In the repo. REST types are generated from it |
 | [mock-aura/](mock-aura) | A fake Aura API for development and tests | Built. A contract test checks every response against the spec |
-| [store/](store) | The store subgraph: Neo4j graph, public read-only schema, internal read-write schema | Built, tested against a real Neo4j |
+| [models/aura](models/aura) | The graph model: the schema and setup that `grandstack-server` loads with `MODEL=aura` (the store is that server, with no code of its own here) | The model and its tests; the server is a sibling repository |
 | [aura/](aura) | The aura subgraph: connect, encrypted secret, token manager, sync into the store | Built, tested against a real Neo4j and mock-aura. Plans, confirms and reconciles create, edit, pause, resume and delete. Stores and reveals instance passwords |
 | [gateway/](gateway) | Hive Gateway serving the composed supergraph | Built. Not published: only the edge reaches it |
 | [edge/](edge) | Optional (`compose.edge.yaml`): nginx in front of everything with TLS, Basic sign-in, rate limits, security headers | Built, checked by `edge/check.mjs` and CI |

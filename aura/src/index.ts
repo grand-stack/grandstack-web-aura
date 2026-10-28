@@ -22,7 +22,7 @@ const service = new AuraService({
   syncIntervalMs: config.syncIntervalMs,
   operationTimeoutMs: config.operationTimeoutMs,
   secrets: new SecretStore(driver, config.neo4jDatabase, box),
-  store: new StoreClient(config.storeInternalUrl, config.internalToken),
+  store: new StoreClient(config.storeWriterUrl),
 });
 
 // Unexpected errors are masked by default. UserError is a GraphQLError, so its message reaches the person.

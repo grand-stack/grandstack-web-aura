@@ -9,7 +9,6 @@
     "node": ">=22"
   },
   "workspaces": [
-    "store",
     "aura",
     "mock-aura",
     "gateway",

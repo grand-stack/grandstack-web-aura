@@ -9,18 +9,20 @@ export class StoreError extends Error {
   }
 }
 
-/** Talks to the store's internal read-write GraphQL endpoint. */
+/**
+ * Talks to the writable store: a grandstack-server running the aura model, which no one else can reach. It has no sign-in of its own;
+ * what keeps others out is that it is on a private network and is not routed through the gateway.
+ */
 export class StoreClient {
   constructor(
     private readonly url: string,
-    private readonly token: string,
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
   async request<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
     const res = await this.fetchImpl(this.url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, variables }),
     });
     const body = (await res.json().catch(() => ({}))) as { data?: T; errors?: { message: string }[] };
