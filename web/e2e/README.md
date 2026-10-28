@@ -4,14 +4,16 @@
 
 ## Run it
 
-1. Start a **fresh** stack from the repository root: `podman compose -p gwa down -v`, then bring it up as described in the README. The fake Aura must be the one the stack uses (the default).
+1. Start a **fresh** stack from the repository root with the dev file (the run changes the fake Aura directly): `podman compose -p gwa -f compose.yaml -f compose.dev.yaml down -v`, then `up -d --build` with the same files. Run `scripts/init-env.sh` first if you have not, and keep the sign-in password it prints. The fake Aura must be the one the stack uses (the default).
 2. `npm ci` once.
-3. `npm run e2e -w web`
+3. `E2E_PASSWORD=<the sign-in password> npm run e2e -w web`
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `BASE_URL` | `http://localhost:3100` | The web app |
-| `GRAPHQL_URL` | `http://localhost:4100/graphql` | The gateway, used to read what the app stored |
+| `E2E_PASSWORD` | required | The sign-in password `scripts/init-env.sh` printed |
+| `E2E_USER` | `admin` | The sign-in user |
+| `BASE_URL` | `https://localhost:8443` | The edge. Its certificate is made for localhost, so the run trusts it when the host is `localhost` |
+| `GRAPHQL_URL` | `$BASE_URL/graphql` | The gateway through the edge, used to read what the app stored |
 | `MOCK_AURA_URL` | `http://localhost:4020` | The fake Aura, which the run changes (it deletes an instance there) |
 | `CHROME_PATH` | macOS Google Chrome path | A Chrome or Chromium executable. Set it on Linux, for example `/usr/bin/chromium` |
 | `OUT` | unset | A directory to write screenshots to (about thirty) |

@@ -1,0 +1,106 @@
+# Copyright (c) "Neo4j"
+# Neo4j Sweden AB [http://neo4j.com]
+# Two jobs: the tests (unit, and integration against a real Neo4j), and the whole stack (the committed supergraph is current, the edge
+# keeps its promises, and a real Chrome drives the app through it). Actions are pinned by commit, images by digest.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24.22.1"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      neo4j:
+        image: neo4j:2026.10.0-community@sha256:388c0e5c6d4543e3d0e6cee3d1e751c05ad9314aa73342cc63cd0ea0946e38bb
+        env:
+          NEO4J_AUTH: neo4j/ci-test-password
+        ports:
+          - 7687:7687
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p ci-test-password 'RETURN 1'"
+          --health-interval 5s --health-timeout 5s --health-retries 30 --health-start-period 15s
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Known vulnerabilities in what ships
+        run: npm audit --omit=dev --audit-level=high
+      - name: Tests, with the integration tests against Neo4j
+        run: npm test
+        env:
+          NEO4J_TEST_URI: bolt://localhost:7687
+          NEO4J_TEST_PASSWORD: ci-test-password
+
+  stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE: docker compose -p gwa -f compose.yaml -f compose.dev.yaml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Keys, certificate and sign-in
+        run: |
+          sudo apt-get install -y --no-install-recommends apache2-utils
+          ./scripts/init-env.sh | tee init.out
+          # The password is shown once, here, to a throwaway runner. It is not a secret of anyone's.
+          echo "EDGE_PASSWORD=$(awk '/^Password/ {print $NF}' init.out)" >> "$GITHUB_ENV"
+      - name: Start the stack
+        run: |
+          $COMPOSE up -d --build
+          for i in $(seq 1 90); do curl -sf 'http://localhost:4100/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
+          for i in $(seq 1 60); do [ "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:8443/healthz)" = 200 ] && break; sleep 2; done
+      - name: The committed supergraph is what the running subgraphs compose to
+        run: |
+          npm run compose:supergraph
+          git diff --exit-code gateway/supergraph.graphql
+      - name: The edge keeps its promises
+        run: |
+          # A second edge with a low mutation rate, to see mutations refused once it is passed
+          docker run -d --name edge-limited --network gwa_default -p 127.0.0.1:8444:8443 -e EDGE_MUTATION_RATE=6r/m \
+            -v "$PWD/edge/secrets/htpasswd:/etc/nginx/secrets/htpasswd:ro" -v "$PWD/edge/secrets/tls.crt:/etc/nginx/secrets/tls.crt:ro" \
+            -v "$PWD/edge/secrets/tls.key:/etc/nginx/secrets/tls.key:ro" gwa-edge:latest
+          sleep 5
+          DEV_PORTS=1 LIMITED_URL=https://localhost:8444 node edge/check.mjs
+      - name: The app in a real browser, through the edge
+        run: |
+          # The browser run needs a stack with no account connected, which this is
+          CHROME_PATH=/usr/bin/google-chrome E2E_PASSWORD="$EDGE_PASSWORD" npm run e2e -w web
+      - name: Only the edge is published when the dev file is not used
+        run: |
+          $COMPOSE down -v
+          docker compose -p gwa up -d
+          for i in $(seq 1 60); do [ "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:8443/healthz)" = 200 ] && break; sleep 2; done
+          for i in $(seq 1 60); do curl -sfk -u "admin:$EDGE_PASSWORD" 'https://localhost:8443/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
+          node edge/check.mjs
+        env:
+          EDGE_USER: admin
+      - name: Logs, if anything failed
+        if: failure()
+        run: docker compose -p gwa logs --no-color --tail 80

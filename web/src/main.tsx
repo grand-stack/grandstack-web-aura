@@ -15,7 +15,8 @@ applyTheme(loadTheme());
 
 const client = new Client({
   // The browser talks to the gateway only. It never sees the store's internal endpoint or the Aura API.
-  url: import.meta.env.VITE_GRAPHQL_URL ?? "http://localhost:4100/graphql",
+  // Same origin by default: the edge serves the app and the gateway together, so the browser sends its sign-in with every request
+  url: import.meta.env.VITE_GRAPHQL_URL || "/graphql",
   exchanges: [cacheExchange, fetchExchange],
   // Show what is cached straight away, but always check, so lists and counts follow the store
   requestPolicy: "cache-and-network",

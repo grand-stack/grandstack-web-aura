@@ -6,5 +6,6 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react()],
   // 3100, not 3000: grandstack's own web app uses 3000
-  server: { port: 3100, host: true },
+  // `npm run dev` talks to the gateway the dev compose file publishes on 4100
+  server: { port: 3100, host: true, proxy: { "/graphql": process.env.DEV_GATEWAY ?? "http://localhost:4100" } },
 });

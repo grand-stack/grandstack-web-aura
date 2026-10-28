@@ -12,8 +12,8 @@ COPY web/package.json web/
 RUN npm ci --workspace web --include-workspace-root
 COPY docs ./docs
 COPY web ./web
-# The browser calls the gateway directly, so this must be a URL reachable from the browser
-ARG VITE_GRAPHQL_URL=http://localhost:4100/graphql
+# The app calls /graphql on its own origin, where the edge forwards it to the gateway. Set this only to point it somewhere else.
+ARG VITE_GRAPHQL_URL=
 ENV VITE_GRAPHQL_URL=$VITE_GRAPHQL_URL
 RUN npm run build -w web
 

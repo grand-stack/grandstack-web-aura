@@ -1,0 +1,77 @@
+# Copyright (c) "Neo4j"
+# Neo4j Sweden AB [http://neo4j.com]
+# One origin for everything: / is the web app, /graphql is the gateway. Both need a sign-in. Nothing else is reachable from outside.
+
+# Requests a person's address may make per second. Brute-forcing the sign-in is bounded by this and by the length of the password.
+limit_req_zone $binary_remote_addr zone=gwa_requests:10m rate=${EDGE_REQUEST_RATE};
+# Mutations are POSTs (queries are GETs), so a lower rate for POST bounds how fast changes can be asked for. Other methods have no key.
+map $request_method $gwa_mutation_key {
+  POST    $binary_remote_addr;
+  default "";
+}
+limit_req_zone $gwa_mutation_key zone=gwa_mutations:10m rate=${EDGE_MUTATION_RATE};
+limit_req_status 429;
+
+# HSTS is for a real hostname. It applies to a whole host, whatever the port, so it is off unless EDGE_HSTS is set.
+map "" $gwa_hsts { default "${EDGE_HSTS}"; }
+
+server {
+  listen 8443 ssl;
+  http2 on;
+  server_name _;
+
+  ssl_certificate     /etc/nginx/secrets/tls.crt;
+  ssl_certificate_key /etc/nginx/secrets/tls.key;
+  ssl_protocols       TLSv1.2 TLSv1.3;
+  ssl_session_tickets off;
+  server_tokens off;
+
+  # The gateway and the web container get a new address when they restart. Looking the name up again every few seconds (instead of
+  # once at start-up) keeps the edge working across that. The image fills in the address of the network's own resolver.
+  resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+  set $gwa_gateway http://gateway:4000;
+  set $gwa_web     http://web:8080;
+
+  include /etc/nginx/snippets/security-headers.conf;
+  add_header Strict-Transport-Security $gwa_hsts always;
+
+  auth_basic           "Aura console";
+  auth_basic_user_file /etc/nginx/secrets/htpasswd;
+  limit_req            zone=gwa_requests burst=60 nodelay;
+
+  # The upstreams never see the sign-in
+  proxy_set_header Authorization "";
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto https;
+  proxy_http_version 1.1;
+  proxy_read_timeout 60s;
+
+  # For the container's health check. Says nothing about the app.
+  location = /healthz {
+    auth_basic off;
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+
+  location /graphql {
+    # A client secret is the biggest thing sent. Anything larger is not this app.
+    client_max_body_size 64k;
+    limit_req zone=gwa_requests burst=60 nodelay;
+    limit_req zone=gwa_mutations burst=30 nodelay;
+    # Answers can hold a password the person asked to see, so nothing may keep them
+    proxy_hide_header Cache-Control;
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Strict-Transport-Security $gwa_hsts always;
+    add_header Cache-Control "no-store" always;
+    proxy_pass $gwa_gateway;
+  }
+
+  location / {
+    client_max_body_size 1k;
+    limit_except GET HEAD { deny all; }
+    proxy_hide_header X-Frame-Options;
+    proxy_hide_header X-Content-Type-Options;
+    proxy_hide_header Referrer-Policy;
+    proxy_pass $gwa_web;
+  }
+}

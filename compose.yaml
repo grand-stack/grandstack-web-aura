@@ -1,26 +1,23 @@
 # Copyright (c) "Neo4j"
 # Neo4j Sweden AB [http://neo4j.com]
-# Neo4j, the store and aura subgraphs, a fake Aura API and the gateway. Pointed at mock-aura by default: no real Aura account is touched.
-# Ports are offset from grandstack's compose file (7474/7687, 4000) so both stacks can run at once.
-# There is no sign-in yet (PLAN.md Phase 5), so every published port is bound to 127.0.0.1 and nothing is reachable from the network.
+# Neo4j, the store and aura subgraphs, a fake Aura API, the gateway, the web app, and the edge in front of them.
+# Pointed at mock-aura by default: no real Aura account is touched.
+# Only the edge publishes a port (8443, TLS, sign-in required). Everything else is on the compose network. To develop with the other
+# services published on loopback (Neo4j, subgraphs, mock-aura, gateway), add compose.dev.yaml: -f compose.yaml -f compose.dev.yaml
 #
 # First time:
-#   echo "SECRET_KEY=$(openssl rand -base64 32)" >> .env     # seals the Aura client secret. Keep it: a new key cannot open old secrets
-#   docker compose -p gwa up -d --build neo4j store aura mock-aura
-#   npm run compose:supergraph                                # composes gateway/supergraph.graphql from the running subgraphs
-#   docker compose -p gwa up -d --build gateway web           # the app is then at http://localhost:3100
+#   scripts/init-env.sh                                       # .env (keys), a certificate, and the sign-in (prints the password once)
+#   docker compose -p gwa up -d --build                       # the app is then at https://localhost:8443
+# After a schema change, compose the supergraph with the dev file (see README.md) and rebuild the gateway.
 services:
   neo4j:
     image: neo4j:2026.10.0-community@sha256:388c0e5c6d4543e3d0e6cee3d1e751c05ad9314aa73342cc63cd0ea0946e38bb
     environment:
-      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-gwa-dev-password}
-    ports:
-      - "127.0.0.1:7475:7474"
-      - "127.0.0.1:7688:7687"
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?Run scripts/init-env.sh first}
     volumes:
       - neo4j-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p $${NEO4J_PASSWORD:-gwa-dev-password} 'RETURN 1' || exit 1"]
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1' || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -33,11 +30,8 @@ services:
     environment:
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USERNAME: neo4j
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-gwa-dev-password}
-      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-gwa-dev-internal-token}
-    ports:
-      # Only the public, read-only subgraph is published, for composing the supergraph. The internal endpoint (4002) stays on the compose network.
-      - "127.0.0.1:4001:4001"
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?Run scripts/init-env.sh first}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?Run scripts/init-env.sh first}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:4001/graphql?query=%7B__typename%7D').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 5s
@@ -55,17 +49,14 @@ services:
     environment:
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USERNAME: neo4j
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-gwa-dev-password}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?Run scripts/init-env.sh first}
       STORE_INTERNAL_URL: http://store:4002/graphql
-      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-gwa-dev-internal-token}
-      SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY first, as described at the top of compose.yaml}"
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?Run scripts/init-env.sh first}
+      SECRET_KEY: "${SECRET_KEY:?Run scripts/init-env.sh first}"
       # The fake Aura by default. For a real account set AURA_BASE_URL=https://api.neo4j.io (ALLOW_INSECURE_AURA_URL then has no effect).
       AURA_BASE_URL: ${AURA_BASE_URL:-http://mock-aura:4020}
       ALLOW_INSECURE_AURA_URL: ${ALLOW_INSECURE_AURA_URL:-true}
       SYNC_INTERVAL_MS: ${SYNC_INTERVAL_MS:-900000}
-    ports:
-      # For composing the supergraph. The subgraph has no sign-in of its own, so it is loopback only.
-      - "127.0.0.1:4010:4010"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:4010/graphql?query=%7B__typename%7D').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 5s
@@ -84,18 +75,13 @@ services:
       dockerfile: mock-aura/Dockerfile
     environment:
       MOCK_STEP_MS: ${MOCK_STEP_MS:-3000}
-    ports:
-      - "127.0.0.1:4020:4020"
 
   gateway:
     build:
       context: gateway
     environment:
-      # The web app's address. 3100, not 3000: grandstack's own web app uses 3000
-      CORS_ORIGIN: http://localhost:3100,http://127.0.0.1:3100
-    ports:
-      # 4100, not 4000: grandstack's own gateway and server use 4000
-      - "127.0.0.1:4100:4000"
+      # Only the edge reaches the gateway, so this is the edge's own address
+      CORS_ORIGIN: ${PUBLIC_ORIGIN:-https://localhost:8443}
     depends_on:
       store:
         condition: service_healthy
@@ -107,11 +93,33 @@ services:
       context: .
       dockerfile: web/Dockerfile
       args:
-        # The browser calls the gateway directly, so this must be reachable from the browser, not a compose service name
-        VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-http://localhost:4100/graphql}
-    ports:
-      - "127.0.0.1:3100:8080"
+        # Empty: the app calls /graphql on its own origin, which the edge forwards to the gateway
+        VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-}
     depends_on:
+      - gateway
+
+  edge:
+    build:
+      context: edge
+    environment:
+      EDGE_REQUEST_RATE: ${EDGE_REQUEST_RATE:-20r/s}
+      EDGE_MUTATION_RATE: ${EDGE_MUTATION_RATE:-60r/m}
+      # Set to e.g. "max-age=31536000" once this has a real hostname with a real certificate. It applies to the whole host.
+      EDGE_HSTS: ${EDGE_HSTS:-}
+    volumes:
+      - ./edge/secrets/htpasswd:/etc/nginx/secrets/htpasswd:ro
+      - ./edge/secrets/tls.crt:/etc/nginx/secrets/tls.crt:ro
+      - ./edge/secrets/tls.key:/etc/nginx/secrets/tls.key:ro
+    ports:
+      # Loopback by default. To serve other machines set EDGE_BIND=0.0.0.0, and read docs/deploying.md first.
+      - "${EDGE_BIND:-127.0.0.1}:${EDGE_PORT:-8443}:8443"
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "-q", "-O", "/dev/null", "https://localhost:8443/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      - web
       - gateway
 
 volumes:
