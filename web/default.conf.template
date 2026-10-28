@@ -1,0 +1,42 @@
+# Copyright (c) "Neo4j"
+# Neo4j Sweden AB [http://neo4j.com]
+# The web app, and /graphql forwarded to the gateway, so the app and its data share one origin whether or not the edge is in front.
+# Without the edge there is no sign-in and no TLS here: see docs/deploying.md.
+server {
+  listen 8080;
+  root /usr/share/nginx/html;
+  index index.html;
+  server_tokens off;
+
+  include /etc/nginx/snippets/security-headers.conf;
+
+  # The gateway gets a new address when it restarts, so its name is looked up again every few seconds
+  resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+  set $gwa_gateway http://gateway:4000;
+
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    include /etc/nginx/snippets/security-headers.conf;
+  }
+
+  location /graphql {
+    client_max_body_size 64k;
+    # Answers can hold a password the person asked to see, so nothing may keep them
+    proxy_hide_header Cache-Control;
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Cache-Control "no-store" always;
+    proxy_http_version 1.1;
+    proxy_read_timeout 60s;
+    proxy_set_header Host $host;
+    proxy_pass $gwa_gateway;
+  }
+
+  # Client-side routes (react-router) fall back to the app shell, which must never be cached so a new build is picked up
+  location / {
+    add_header Cache-Control "no-cache";
+    include /etc/nginx/snippets/security-headers.conf;
+    limit_except GET HEAD { deny all; }
+    try_files $uri /index.html;
+  }
+}

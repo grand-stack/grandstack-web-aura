@@ -6,7 +6,7 @@ Read [PLAN.md](PLAN.md) first. It holds the design, the graph model, the securit
 
 ## Status
 
-Phases 1 to 6 are built and tested. You can create, edit, pause, resume and delete an instance, each with a review and an explicit confirm (a delete also needs the name typed), and show the password Aura gave when an instance was created. It is served over TLS behind a sign-in, with CI. Not yet done: trying it against a real Aura account and on real phones (see docs/real-account-checklist.md).
+Phases 1 to 6 are built and tested. You can create, edit, pause, resume and delete an instance, each with a review and an explicit confirm (a delete also needs the name typed), and show the password Aura gave when an instance was created. It runs on plain HTTP on your machine by default, with an optional edge that adds TLS and a sign-in, and has CI. Not yet done: trying it against a real Aura account and on real phones (see docs/real-account-checklist.md).
 
 | Part | What it is | State |
 | --- | --- | --- |
@@ -15,7 +15,7 @@ Phases 1 to 6 are built and tested. You can create, edit, pause, resume and dele
 | [store/](store) | The store subgraph: Neo4j graph, public read-only schema, internal read-write schema | Built, tested against a real Neo4j |
 | [aura/](aura) | The aura subgraph: connect, encrypted secret, token manager, sync into the store | Built, tested against a real Neo4j and mock-aura. Plans, confirms and reconciles create, edit, pause, resume and delete. Stores and reveals instance passwords |
 | [gateway/](gateway) | Hive Gateway serving the composed supergraph | Built. Not published: only the edge reaches it |
-| [edge/](edge) | nginx in front of everything: TLS, Basic sign-in, rate limits, security headers | Built, checked by `edge/check.mjs` and CI |
+| [edge/](edge) | Optional (`compose.edge.yaml`): nginx in front of everything with TLS, Basic sign-in, rate limits, security headers | Built, checked by `edge/check.mjs` and CI |
 | [web/](web) | The React app: connect, gallery with filters, instance details, create, edit, review and progress screens, password reveal, operations list, account page | Built. Checked in a real browser on a phone and a desktop screen |
 
 ## Run it
@@ -23,19 +23,36 @@ Phases 1 to 6 are built and tested. You can create, edit, pause, resume and dele
 The stack points at mock-aura by default, so no real Aura account is touched. Docker works as well as podman.
 
 ```sh
-scripts/init-env.sh                        # .env (keys), a certificate for localhost, and the sign-in. Prints the password once
-podman compose -p gwa up -d --build        # then open https://localhost:8443 and sign in as admin
+scripts/init-env.sh                        # .env: the key that seals secrets, the database password, a token
+podman compose -p gwa up -d --build        # then open http://localhost:3100
 ```
 
-`scripts/init-env.sh` needs `openssl` and `htpasswd` (from `apache2-utils` on Linux; macOS has both). It never replaces a secret that already exists, because a new `SECRET_KEY` cannot open what the old one sealed. Back `.env` up with the database volume. `scripts/init-env.sh --new-password` chooses a new sign-in password.
+**By default the app is plain HTTP with no sign-in, on this machine only** (`127.0.0.1:3100`). That is fine for you on your own laptop and not for anything else: whoever can open the page can create and delete instances. The web server also forwards `/graphql` to the gateway, so the app and its data share one origin. The gateway, subgraphs, Neo4j and mock-aura are on the compose network and are not published. The first screen asks for the Aura client ID and secret (for the fake Aura use `mock-client` and `mock-secret`).
 
-**Only the edge is published**: `https://localhost:8443`, TLS with a self-signed certificate (your browser will warn once), HTTP Basic sign-in required for everything. It serves the app at `/` and the gateway at `/graphql` on one origin. The web app, gateway, subgraphs, Neo4j and mock-aura are on the compose network only. The first screen asks for the Aura client ID and secret (for the fake Aura use `mock-client` and `mock-secret`).
+`scripts/init-env.sh` needs `openssl`. It never replaces a secret that already exists, because a new `SECRET_KEY` cannot open what the old one sealed. Back `.env` up with the database volume.
 
-To serve other machines, read [docs/deploying.md](docs/deploying.md) first: it needs a real certificate and a long password, and it tells you what the sign-in does and does not protect.
+### The edge: TLS and a sign-in (to reach it from a phone or another machine)
+
+To serve other devices, put the edge in front. It adds TLS, an HTTP Basic sign-in, rate limits and stricter headers, and the app is then no longer published on its own port:
+
+```sh
+scripts/init-env.sh --edge                                   # also a certificate for localhost and the sign-in; prints the password once
+podman compose -p gwa -f compose.yaml -f compose.edge.yaml up -d --build    # https://localhost:8443
+```
+
+`--edge` needs `htpasswd` as well (from `apache2-utils` on Linux; macOS has it). The certificate is self-signed, so a browser warns once. To reach it from a phone on the same network, add the laptop's address to the certificate and publish on the network:
+
+```sh
+EDGE_SAN="IP:192.168.0.5,DNS:mylaptop.local" scripts/init-env.sh --new-cert
+echo "EDGE_BIND=0.0.0.0" >> .env
+podman compose -p gwa -f compose.yaml -f compose.edge.yaml up -d --force-recreate edge
+```
+
+Read [docs/deploying.md](docs/deploying.md) before doing that: it says what the sign-in does and does not protect. Plain HTTP can be opened to the network too (`WEB_BIND=0.0.0.0`), but then there is nothing in the way at all.
 
 ### Developing against the services directly
 
-`compose.dev.yaml` also publishes the services on loopback only, with no sign-in. Never use it where other people can reach the machine, or in a deployment:
+`compose.dev.yaml` also publishes the services on loopback only, with no sign-in. Never use it where other people can reach the machine, or in a deployment. It combines with either mode:
 
 ```sh
 podman compose -p gwa -f compose.yaml -f compose.dev.yaml up -d --build
@@ -87,14 +104,14 @@ podman run -d --rm --name gwa-neo4j-test -p 7688:7687 -e NEO4J_AUTH=neo4j/gwa-te
 NEO4J_TEST_URI=bolt://localhost:7688 NEO4J_TEST_PASSWORD=gwa-test-password npm test
 ```
 
-To check the web app in a real browser (needs Chrome and a fresh stack), see [web/e2e/README.md](web/e2e/README.md): `E2E_PASSWORD=... npm run e2e -w web`. To check what the edge promises (sign-in, headers, closed ports): `EDGE_PASSWORD=... node edge/check.mjs`.
+To check the web app in a real browser (needs Chrome and a fresh stack), see [web/e2e/README.md](web/e2e/README.md): `npm run e2e -w web` (add `BASE_URL=https://localhost:8443 E2E_PASSWORD=...` to run through the edge). To check what the edge promises (sign-in, headers, closed ports): `EDGE_PASSWORD=... node edge/check.mjs`.
 
 After a change to a subgraph's schema, start the stack with the dev file, recompose the supergraph (`npm run compose:supergraph`) and commit it. CI fails if the committed file is not what the running subgraphs compose to.
 
 ## Safety notes
 
 - Never point development or tests at a real Aura account. Creates and deletes cost money and cannot be undone. Use mock-aura.
-- Everything is behind the edge's sign-in and TLS. The gateway, subgraphs and database have no sign-in of their own and are not published, except by `compose.dev.yaml`.
+- By default the app is plain HTTP with no sign-in, on loopback. With the edge (`compose.edge.yaml`) everything is behind TLS and a sign-in. Either way the gateway, subgraphs and database have no sign-in of their own and are not published, except by `compose.dev.yaml`.
 - The store's internal endpoint can change anything. It needs `INTERNAL_TOKEN` and must never be routed through the gateway or published.
 - The Aura client secret and instance passwords are never GraphQL fields and are stored only as ciphertext. See PLAN.md section 6.
 - One sign-in means one level of access: anyone who can sign in can delete instances. There is no view-only role yet.

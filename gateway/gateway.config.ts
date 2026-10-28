@@ -2,10 +2,10 @@
 // Neo4j Sweden AB [http://neo4j.com]
 // Hive Gateway serving gateway/supergraph.graphql: the one GraphQL endpoint for the web app.
 // The supergraph was composed against localhost addresses; here the subgraph addresses are replaced for the compose network.
-// The gateway has no sign-in of its own. It is not published: only the edge reaches it, and the edge asks everyone to sign in.
+// The gateway has no sign-in of its own. It is not published: only the web server (or the edge in front of it) reaches it.
 import { defineConfig } from "@graphql-hive/gateway";
 
-const origins = (process.env.CORS_ORIGIN ?? "https://localhost:8443").split(",").map((o) => o.trim()).filter(Boolean);
+const origins = (process.env.CORS_ORIGIN ?? "http://localhost:3100").split(",").map((o) => o.trim()).filter(Boolean);
 
 export const gatewayConfig = defineConfig({
   // No browser query editor: it is a web app of its own (with its own dependencies) served by the gateway, and nothing here needs it

@@ -2,6 +2,11 @@
 
 This tool can delete databases from a phone. Read this before it is reachable by anyone but you.
 
+## Two ways to run it
+
+- **Plain (the default)**: `compose.yaml` publishes the web server on `127.0.0.1:3100`, over HTTP, with no sign-in. Only for your own machine. `WEB_BIND=0.0.0.0` would open it to the network with nothing in the way, so do not.
+- **With the edge**: add `compose.edge.yaml`. The web server stops being published and the edge becomes the only way in, over TLS with a sign-in. Everything below is about this mode, and it is the one to use for a phone or another machine. Make its secrets with `scripts/init-env.sh --edge`.
+
 ## What the sign-in is, and is not
 
 The edge (`edge/`) asks for a username and password with HTTP Basic, over TLS, before it serves anything: the app, the GraphQL endpoint, even the app's own files. The gateway, subgraphs, web container and database are on the compose network and are not published.
@@ -18,6 +23,7 @@ The edge (`edge/`) asks for a username and password with HTTP Basic, over TLS, b
 2. Set in `.env`: `PUBLIC_ORIGIN=https://your.host`, `EDGE_BIND=0.0.0.0` (or an address), `EDGE_PORT=443` if you want it. Binding below 1024 may need the container runtime to allow it, or put a port forward in front.
 3. Set `EDGE_HSTS=max-age=31536000` once the certificate is real. It tells browsers to use only HTTPS for the whole host, whatever the port, so do not set it for `localhost`.
 4. Open only that one port in the firewall. Nothing else is published unless you add `compose.dev.yaml`, which you must not.
+5. To reach it from a phone on the same network by a self-signed certificate, reissue it for the laptop's address: `EDGE_SAN="IP:192.168.0.5,DNS:mylaptop.local" scripts/init-env.sh --new-cert`, then recreate the edge. If the address changes (a new wifi lease), reissue it.
 
 ## Secrets and backups
 

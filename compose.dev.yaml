@@ -24,8 +24,3 @@ services:
     ports:
       # 4100, not 4000: grandstack's own gateway and server use 4000. For codegen and `npm run dev`.
       - "127.0.0.1:4100:4000"
-  edge:
-    environment:
-      # The browser run makes many changes in a minute. Real use never needs this.
-      EDGE_MUTATION_RATE: ${EDGE_MUTATION_RATE:-1200r/m}
-      EDGE_REQUEST_RATE: ${EDGE_REQUEST_RATE:-200r/s}

@@ -55,7 +55,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      # The app on plain HTTP (the default), with the other services published on loopback for the checks below
       COMPOSE: docker compose -p gwa -f compose.yaml -f compose.dev.yaml
+      EDGE_COMPOSE: docker compose -p gwa -f compose.yaml -f compose.edge.yaml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,21 +67,30 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Keys, certificate and sign-in
+      - name: Keys, and the edge's certificate and sign-in
         run: |
           sudo apt-get install -y --no-install-recommends apache2-utils
-          ./scripts/init-env.sh | tee init.out
+          ./scripts/init-env.sh --edge | tee init.out
           # The password is shown once, here, to a throwaway runner. It is not a secret of anyone's.
           echo "EDGE_PASSWORD=$(awk '/^Password/ {print $NF}' init.out)" >> "$GITHUB_ENV"
-      - name: Start the stack
+      - name: Start the stack (plain HTTP)
         run: |
           $COMPOSE up -d --build
-          for i in $(seq 1 90); do curl -sf 'http://localhost:4100/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
-          for i in $(seq 1 60); do [ "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:8443/healthz)" = 200 ] && break; sleep 2; done
+          for i in $(seq 1 90); do curl -sf 'http://localhost:3100/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
       - name: The committed supergraph is what the running subgraphs compose to
         run: |
           npm run compose:supergraph
           git diff --exit-code gateway/supergraph.graphql
+      - name: The app in a real browser
+        run: |
+          # The browser run needs a stack with no account connected, which this is
+          CHROME_PATH=/usr/bin/google-chrome npm run e2e -w web
+      - name: Switch to the edge, with only the edge published
+        run: |
+          $COMPOSE down -v
+          $EDGE_COMPOSE up -d --build
+          for i in $(seq 1 60); do [ "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:8443/healthz)" = 200 ] && break; sleep 2; done
+          for i in $(seq 1 60); do curl -sfk -u "admin:$EDGE_PASSWORD" 'https://localhost:8443/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
       - name: The edge keeps its promises
         run: |
           # A second edge with a low mutation rate, to see mutations refused once it is passed
@@ -87,18 +98,7 @@ jobs:
             -v "$PWD/edge/secrets/htpasswd:/etc/nginx/secrets/htpasswd:ro" -v "$PWD/edge/secrets/tls.crt:/etc/nginx/secrets/tls.crt:ro" \
             -v "$PWD/edge/secrets/tls.key:/etc/nginx/secrets/tls.key:ro" gwa-edge:latest
           sleep 5
-          DEV_PORTS=1 LIMITED_URL=https://localhost:8444 node edge/check.mjs
-      - name: The app in a real browser, through the edge
-        run: |
-          # The browser run needs a stack with no account connected, which this is
-          CHROME_PATH=/usr/bin/google-chrome E2E_PASSWORD="$EDGE_PASSWORD" npm run e2e -w web
-      - name: Only the edge is published when the dev file is not used
-        run: |
-          $COMPOSE down -v
-          docker compose -p gwa up -d
-          for i in $(seq 1 60); do [ "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:8443/healthz)" = 200 ] && break; sleep 2; done
-          for i in $(seq 1 60); do curl -sfk -u "admin:$EDGE_PASSWORD" 'https://localhost:8443/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
-          node edge/check.mjs
+          LIMITED_URL=https://localhost:8444 node edge/check.mjs
         env:
           EDGE_USER: admin
       - name: Logs, if anything failed

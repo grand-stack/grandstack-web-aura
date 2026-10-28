@@ -1,0 +1,33 @@
+# Copyright (c) "Neo4j"
+# Neo4j Sweden AB [http://neo4j.com]
+# Puts TLS, a sign-in, rate limits and security headers in front of the app, and stops the app being published on its own port.
+# This is the way to serve other devices. Read docs/deploying.md first.
+#   scripts/init-env.sh --edge
+#   docker compose -p gwa -f compose.yaml -f compose.edge.yaml up -d --build
+services:
+  web:
+    # Only the edge is published
+    ports: !reset []
+  edge:
+    build:
+      context: edge
+    environment:
+      EDGE_REQUEST_RATE: ${EDGE_REQUEST_RATE:-20r/s}
+      EDGE_MUTATION_RATE: ${EDGE_MUTATION_RATE:-60r/m}
+      # Set to e.g. "max-age=31536000" once this has a real hostname with a real certificate. It applies to the whole host.
+      EDGE_HSTS: ${EDGE_HSTS:-}
+    volumes:
+      - ./edge/secrets/htpasswd:/etc/nginx/secrets/htpasswd:ro
+      - ./edge/secrets/tls.crt:/etc/nginx/secrets/tls.crt:ro
+      - ./edge/secrets/tls.key:/etc/nginx/secrets/tls.key:ro
+    ports:
+      # Loopback by default. To serve other machines set EDGE_BIND=0.0.0.0, and read docs/deploying.md first.
+      - "${EDGE_BIND:-127.0.0.1}:${EDGE_PORT:-8443}:8443"
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "-q", "-O", "/dev/null", "https://localhost:8443/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      - web
+      - gateway

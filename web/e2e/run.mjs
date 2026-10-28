@@ -4,18 +4,19 @@
 import puppeteer from "puppeteer-core";
 import { mkdirSync } from "node:fs";
 
-// The app is only reachable through the edge, which asks for a sign-in and serves a certificate made for localhost
-const BASE = process.env.BASE_URL ?? "https://localhost:8443";
+// By default the app is the web server on plain HTTP. With the edge in front (BASE_URL=https://localhost:8443) set E2E_PASSWORD to the sign-in
+// password scripts/init-env.sh --edge printed.
+const BASE = process.env.BASE_URL ?? "http://localhost:3100";
 const GATEWAY = process.env.GRAPHQL_URL ?? `${BASE}/graphql`;
 const USER = process.env.E2E_USER ?? "admin";
 const PASSWORD = process.env.E2E_PASSWORD;
-if (!PASSWORD) {
-  console.error("Set E2E_PASSWORD to the sign-in password scripts/init-env.sh printed.");
+if (!PASSWORD && BASE.startsWith("https:")) {
+  console.error("Set E2E_PASSWORD to the sign-in password scripts/init-env.sh --edge printed.");
   process.exit(2);
 }
-const AUTH = `Basic ${Buffer.from(`${USER}:${PASSWORD}`).toString("base64")}`;
+const AUTH = PASSWORD ? `Basic ${Buffer.from(`${USER}:${PASSWORD}`).toString("base64")}` : undefined;
 // Calls made from this script (not the browser) trust the local certificate too
-if (new URL(BASE).hostname === "localhost") process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+if (BASE.startsWith("https:") && new URL(BASE).hostname === "localhost") process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const CHROME_ARGS = ["--no-sandbox", "--ignore-certificate-errors"];
 const MOCK = process.env.MOCK_AURA_URL ?? "http://localhost:4020";
 const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -55,7 +56,7 @@ async function freshPage(viewport = DESKTOP, relaunch = false) {
     loads = 0;
   } else if (page) await page.close().catch(() => {});
   page = await browser.newPage();
-  await page.authenticate({ username: USER, password: PASSWORD });
+  if (PASSWORD) await page.authenticate({ username: USER, password: PASSWORD });
   await page.setViewport(viewport);
   page.on("console", (m) => { if (["error", "warning"].includes(m.type())) problems.push(`console.${m.type()}: ${m.text()}`); });
   page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
@@ -87,7 +88,7 @@ const typeInto = async (selector, value) => {
 };
 
 async function gql(query, variables) {
-  const res = await fetch(GATEWAY, { method: "POST", headers: { "Content-Type": "application/json", Authorization: AUTH }, body: JSON.stringify({ query, variables }) });
+  const res = await fetch(GATEWAY, { method: "POST", headers: { "Content-Type": "application/json", ...(AUTH ? { Authorization: AUTH } : {}) }, body: JSON.stringify({ query, variables }) });
   return (await res.json()).data;
 }
 async function auraToken() {
@@ -534,7 +535,7 @@ await shot("80-password-shown-desktop");
 await page.click("button[aria-label='Hide password']");
 check("hiding it removes it from the page", await waitFor(() => document.querySelector("[data-state=hidden]")) && !(await page.evaluate(() => document.body.innerHTML)).includes(realPassword));
 check("the password was never put in storage or the URL", !(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).includes(realPassword) && !page.url().includes(realPassword));
-check("the stored password cannot be asked for in a query", (await (await fetch(GATEWAY, { method: "POST", headers: { "Content-Type": "application/json", Authorization: AUTH }, body: JSON.stringify({ query: `{ instances { password passwordCipher } }` }) })).json()).errors?.length > 0);
+check("the stored password cannot be asked for in a query", (await (await fetch(GATEWAY, { method: "POST", headers: { "Content-Type": "application/json", ...(AUTH ? { Authorization: AUTH } : {}) }, body: JSON.stringify({ query: `{ instances { password passwordCipher } }` }) })).json()).errors?.length > 0);
 check("an instance found by a sync says why it has no password to show", await (async () => { await open("/instances/a1b2c3d4", DESKTOP); await waitText("h1", "orders-elsewhere"); return (await count("button[aria-label='Show password']")) === 0 && (await waitText(".note", "found by a sync")); })());
 
 // Check with Aura: nothing changes until the person syncs
