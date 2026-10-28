@@ -91,11 +91,11 @@ check("a POST to the app shell is refused", (await request(EDGE, "/", { method: 
 // What does not reach the network
 const url = new URL(EDGE);
 check("plain http is not answered on the edge's port", (await request(`http://${url.hostname}:${url.port}`, "/").catch(() => ({ status: 0 }))).status !== 200);
-// Only the edge may be published. (The dev compose file publishes the rest on loopback, so this is skipped with DEV_PORTS=1.)
+// Only the edge may be published. (compose.aura.yaml publishes the rest on loopback, so this is skipped with DEV_PORTS=1.)
+// These are the ports that setup uses; set CLOSED_PORTS=3100,4100,... for another layout.
 if (process.env.DEV_PORTS !== "1") {
-  for (const [name, port] of [["the web container", 3100], ["the gateway", 4100], ["the store", 4001], ["the aura subgraph", 4010], ["the fake Aura", 4020], ["Neo4j's HTTP port", 7475], ["Neo4j's Bolt port", 7688]]) {
-    check(`${name} is not published (port ${port})`, !(await probe(url.hostname, port)));
-  }
+  const closed = process.env.CLOSED_PORTS ? process.env.CLOSED_PORTS.split(",").map(Number) : [3000, 4000, 4001, 4010, 4020, 7474, 7687];
+  for (const port of closed) check(`nothing but the edge is published (port ${port} is closed)`, !(await probe(url.hostname, port)));
 }
 
 if (process.env.LIMITED_URL) {

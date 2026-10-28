@@ -584,6 +584,8 @@ check("its page says it is gone and offers no actions", (await waitText(".banner
 // ───────────────────────────── 11. Theme ─────────────────────────────
 await open("/", DESKTOP);
 await waitText("h1", "Find an instance");
+// The machine running this may itself be in dark mode, so say what the system prefers
+await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
 await page.evaluate(() => { localStorage.removeItem("gwa-theme"); document.documentElement.removeAttribute("data-theme"); });
 const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 const light = await bg();

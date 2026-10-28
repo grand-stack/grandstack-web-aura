@@ -16,9 +16,9 @@ const fieldsOf = (type: string): FieldDefinitionNode[] => [...(objectTypes.get(t
 const names = (type: string) => fieldsOf(type).map((f) => f.name.value);
 
 describe("the composed supergraph", () => {
-  it("joins the store and aura subgraphs", () => {
+  it("joins the Neo4j (store) and aura subgraphs", () => {
     expect(sdl).toMatch(/enum join__Graph \{[^}]*AURA @join__graph\(name: "Aura"/s);
-    expect(sdl).toMatch(/enum join__Graph \{[^}]*STORE @join__graph\(name: "Store"/s);
+    expect(sdl).toMatch(/enum join__Graph \{[^}]*NEO4J @join__graph\(name: "Neo4j"/s);
   });
 
   it("can only be changed through the aura subgraph's mutations, which plan, confirm and cancel", () => {
@@ -50,7 +50,7 @@ describe("the composed supergraph", () => {
   });
 
   it("keeps Instance a federation entity owned by the store", () => {
-    expect(sdl).toMatch(/type Instance @join__type\(graph: STORE, key: "auraId"\)/);
+    expect(sdl).toMatch(/type Instance @join__type\(graph: NEO4J, key: "auraId"\)/);
   });
 
   it("has no credential type and no field that could return a password, secret or cipher, except the reveal", () => {
