@@ -4,7 +4,7 @@ A mobile-friendly web UI for managing Neo4j Aura. A local Neo4j database is a **
 
 Reads come from the store. The Aura API is called only to sync, to apply a confirmed change, and on an explicit refresh.
 
-Status: **Phases 1 (foundations) and 2 (setup and sync, backend) are built and tested** (section 11). Everything after them is still plan only. See [README.md](README.md) for how to run it.
+Status: **Phases 1 (foundations), 2 (setup and sync, backend) and 3 (read-only web app) are built and tested** (section 11). Everything after them is still plan only. See [README.md](README.md) for how to run it.
 
 ## 1. Spec check
 
@@ -236,7 +236,17 @@ grandstack-web-aura/
    - `compose.yaml` runs Neo4j, store, aura, mock-aura and gateway, pointed at mock-aura by default, with every port bound to 127.0.0.1. The gateway is on **4100**, because grandstack's own stack uses 4000.
    - Checked end to end through the gateway on real containers: wrong secret refused with a plain message, one query spanning both subgraphs, no store mutation reachable, no secret in the database or any real service's log, the internal store port unreachable from the host, disconnect keeps the data, and a restart syncs by itself.
    - Found and fixed while building: relationship `connect` is not idempotent (connecting a linked tag adds a second link, so the sync only connects on create or on a real change); the store's filters have no `neq`; two sync runs in the same second shared a `startedAt`, so the latest run could be the wrong one (timestamps now carry milliseconds); Aura's instance details do **not** include the Neo4j version, so an instance found by a sync has no `version` (only instances created here will).
-3. **Web app, read-only**: React and Vite on the movie app's patterns. The setup form, then the home page, results with filters, instance detail with the connection card, the Operations list and the Aura account page, all reading through the gateway. This is the "instance list in the UI" that was part of the old Phase 2.
+3. **Web app, read-only. Done.** React 19, Vite, react-router and urql, on the movie app's patterns. Everything reads through the gateway.
+   - **Setup**: the connect form (the secret field is cleared after every attempt and kept nowhere), then a first-sync screen with progress, or the error if it failed.
+   - **Home**: hero with search, tenant, cloud and tier tags with counts, and rows of cards ("Needs attention", "Running") with generated posters coloured by cloud.
+   - **Results**: filters in the URL (`q`, `t`, `c`, `tier`, `st`, `rm`, `s`), counts that leave out their own filter, a sidebar on a wide screen and a bottom sheet on a phone, removable chips, and a sort (name, newest, needs attention first, largest first). Sorting is done in the browser because memory is text in the store.
+   - **Instance detail**: status, tags, connection card (URL with copy; says plainly when no password is stored, because the instance was found by a sync), properties, and the changes made here.
+   - **Operations** (empty until Phase 4) and **Aura account**: the connection, stored-copy counts, options per tenant, recent syncs, Sync now, Replace credentials and Disconnect with a confirmation that says what is kept.
+   - Light, dark and follow-the-system themes, remembered, applied before the first paint. Every status has an icon and a word. Status text, field labels and buttons have names for screen readers.
+   - 80 unit tests (filters, sorting, status, sizes, dates, theme, operations) and **100 real-browser checks** (`web/e2e`), run on a phone-sized and a desktop-sized screen: the whole connect, filter, sync, disconnect and reconnect flow, no sideways scrolling, every control named, no console errors, no secret in the page, storage or URL.
+   - Differences from the mockups, on purpose: a **Status** filter and a **Show removed** switch were added (the home page's "See all" links need the first, and instances Aura no longer lists need the second); the Instances icon is hidden on a phone (home is the way in) so the top bar fits on one line; the per-tenant **Refresh** button on the account page is not there, because it needs a backend call that does not exist yet.
+   - Found by looking at screenshots, not by tests: the status chips stretched across the whole card, the phone top bar wrapped onto two lines, and the filter group titles sat on their dividers inconsistently. All fixed, and checks added for the first two.
+   - Found by the browser run: after disconnecting from the Account page and reconnecting, you landed back on the Account page. Connecting now always starts at the home page.
 4. **Plan and confirm**: Operation model and state machine, update and pause/resume first (reversible), review screen.
 5. **Create and delete**: create stepper, storing the connection details and the password reveal, delete with type-to-confirm, drift display.
 6. **Hardening**: UI auth (Basic auth at the gateway and web), TLS guidance, rate-limit tuning against a real account, mobile pass on real devices, docs, CI.

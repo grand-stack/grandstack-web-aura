@@ -8,6 +8,7 @@ COPY store/package.json store/
 COPY aura/package.json aura/
 COPY mock-aura/package.json mock-aura/
 COPY gateway/package.json gateway/
+COPY web/package.json web/
 RUN npm ci --workspace mock-aura --include-workspace-root
 COPY mock-aura ./mock-aura
 RUN npm run build -w mock-aura

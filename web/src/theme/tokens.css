@@ -1,0 +1,40 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [http://neo4j.com]
+ */
+/*
+ * Design tokens, as drawn in the UI mockups. Light by default, dark when the system asks for it, and either one when the person
+ * picks it (data-theme on <html>). Every text and background pairing here was chosen to stay above 4.5:1.
+ */
+:root {
+  --font: "Public Sans Variable", system-ui, sans-serif;
+  --radius: 12px;
+  --radius-sm: 10px;
+  --focus: 3px solid var(--pr);
+  color-scheme: light;
+  --bg: #f4f7fa; --bar: #ffffff; --card: #ffffff; --bd: #d5e0ea; --bd2: #7f95aa;
+  --tx: #0f2233; --mu: #53697d; --pr: #0a6190; --onpr: #ffffff; --prtx: #064a70; --sunk: #e9eff5;
+  --okbg: #e3f5ef; --okfg: #07694f; --infobg: #e3f0f8; --infofg: #064a70;
+  --wbg: #fdf3dc; --wfg: #5c3d00; --dbg: #fdeceb; --dfg: #c0342f; --scrim: rgba(15, 34, 51, 0.45);
+  --shadow: 0 8px 24px rgba(15, 34, 51, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b1520; --bar: #111f2e; --card: #15283a; --bd: #243b50; --bd2: #4a6580;
+    --tx: #eef3f8; --mu: #9bb0c4; --pr: #5db3f0; --onpr: #06202f; --prtx: #8ecbf5; --sunk: #1f3347;
+    --okbg: #12382f; --okfg: #3ddbb0; --infobg: #12324a; --infofg: #8ecbf5;
+    --wbg: #3a2f10; --wfg: #ffc857; --dbg: #3d1c1c; --dfg: #ff7a7a; --scrim: rgba(0, 0, 0, 0.6);
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1520; --bar: #111f2e; --card: #15283a; --bd: #243b50; --bd2: #4a6580;
+  --tx: #eef3f8; --mu: #9bb0c4; --pr: #5db3f0; --onpr: #06202f; --prtx: #8ecbf5; --sunk: #1f3347;
+  --okbg: #12382f; --okfg: #3ddbb0; --infobg: #12324a; --infofg: #8ecbf5;
+  --wbg: #3a2f10; --wfg: #ffc857; --dbg: #3d1c1c; --dfg: #ff7a7a; --scrim: rgba(0, 0, 0, 0.6);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}

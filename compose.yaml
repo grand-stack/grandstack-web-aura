@@ -8,7 +8,7 @@
 #   echo "SECRET_KEY=$(openssl rand -base64 32)" >> .env     # seals the Aura client secret. Keep it: a new key cannot open old secrets
 #   docker compose -p gwa up -d --build neo4j store aura mock-aura
 #   npm run compose:supergraph                                # composes gateway/supergraph.graphql from the running subgraphs
-#   docker compose -p gwa up -d --build gateway
+#   docker compose -p gwa up -d --build gateway web           # the app is then at http://localhost:3100
 services:
   neo4j:
     image: neo4j:2026.10.0-community@sha256:388c0e5c6d4543e3d0e6cee3d1e751c05ad9314aa73342cc63cd0ea0946e38bb
@@ -91,7 +91,8 @@ services:
     build:
       context: gateway
     environment:
-      CORS_ORIGIN: http://localhost:3000
+      # The web app's address. 3100, not 3000: grandstack's own web app uses 3000
+      CORS_ORIGIN: http://localhost:3100,http://127.0.0.1:3100
     ports:
       # 4100, not 4000: grandstack's own gateway and server use 4000
       - "127.0.0.1:4100:4000"
@@ -100,6 +101,18 @@ services:
         condition: service_healthy
       aura:
         condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        # The browser calls the gateway directly, so this must be reachable from the browser, not a compose service name
+        VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-http://localhost:4100/graphql}
+    ports:
+      - "127.0.0.1:3100:8080"
+    depends_on:
+      - gateway
 
 volumes:
   neo4j-data:

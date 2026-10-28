@@ -1,0 +1,112 @@
+// Copyright (c) "Neo4j"
+// Neo4j Sweden AB [http://neo4j.com]
+import { graphql } from "./generated";
+
+// Every read goes to the gateway, which answers from the store (the cached copy of Aura). Instances Aura no longer lists are kept
+// in the store with deletedInAuraAt set; the gallery leaves them out unless asked, so the counts below filter them out too.
+export const SetupQuery = graphql(`
+  query Setup {
+    auraSetup { required connected clientIdHint lastSyncAt syncing lastSyncRunId lastSyncStatus lastSyncError }
+  }
+`);
+
+export const ConnectMutation = graphql(`
+  mutation Connect($clientId: String!, $clientSecret: String!) {
+    connectAura(clientId: $clientId, clientSecret: $clientSecret) { connected syncRunId }
+  }
+`);
+
+export const SyncNowMutation = graphql(`
+  mutation SyncNow { syncNow { started syncRunId } }
+`);
+
+export const DisconnectMutation = graphql(`
+  mutation Disconnect { disconnectAura }
+`);
+
+export const InstanceCardFields = graphql(`
+  fragment InstanceCardFields on Instance {
+    auraId name status statusGroup memory storage region createdAt deletedInAuraAt
+    tenant { auraId name }
+    cloud { name }
+    tier { type label }
+  }
+`);
+
+export const HomeQuery = graphql(`
+  query Home {
+    total: instancesConnection(where: { deletedInAuraAt: { eq: null } }) { totalCount }
+    tenants(sort: [{ name: ASC }]) { auraId name instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }
+    cloudProviders(sort: [{ name: ASC }]) { name instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }
+    tiers(sort: [{ label: ASC }]) { type label instancesConnection(where: { node: { deletedInAuraAt: { eq: null } } }) { totalCount } }
+    attention: instances(
+      where: { AND: [{ deletedInAuraAt: { eq: null } }, { statusGroup: { in: [FAILED, IN_PROGRESS, STOPPED] } }] }
+      sort: [{ name: ASC }]
+      limit: 12
+    ) { ...InstanceCardFields }
+    running: instances(
+      where: { AND: [{ deletedInAuraAt: { eq: null } }, { statusGroup: { eq: READY } }] }
+      sort: [{ name: ASC }]
+      limit: 12
+    ) { ...InstanceCardFields }
+  }
+`);
+
+// One where per facet, each leaving out that facet's own filter, so a tag's count says what you would get by picking it
+export const ResultsQuery = graphql(`
+  query Results(
+    $where: InstanceWhere!
+    $base: InstanceWhere!
+    $noTenant: InstanceWhere!
+    $noCloud: InstanceWhere!
+    $noTier: InstanceWhere!
+    $ready: InstanceWhere!
+    $stopped: InstanceWhere!
+    $inProgress: InstanceWhere!
+    $failed: InstanceWhere!
+  ) {
+    items: instances(where: $where) { ...InstanceCardFields }
+    matching: instancesConnection(where: $where) { totalCount }
+    all: instancesConnection(where: $base) { totalCount }
+    tenants(sort: [{ name: ASC }]) { auraId name instancesConnection(where: { node: $noTenant }) { totalCount } }
+    cloudProviders(sort: [{ name: ASC }]) { name instancesConnection(where: { node: $noCloud }) { totalCount } }
+    tiers(sort: [{ label: ASC }]) { type label instancesConnection(where: { node: $noTier }) { totalCount } }
+    ready: instancesConnection(where: $ready) { totalCount }
+    stopped: instancesConnection(where: $stopped) { totalCount }
+    inProgress: instancesConnection(where: $inProgress) { totalCount }
+    failed: instancesConnection(where: $failed) { totalCount }
+  }
+`);
+
+export const DetailQuery = graphql(`
+  query Detail($id: String!) {
+    instances(where: { auraId: { eq: $id } }) {
+      ...InstanceCardFields
+      connectionUrl version vectorOptimized graphAnalyticsPlugin secondariesCount cdcEnrichmentMode
+      metricsIntegrationUrl graphNodes graphRelationships customerManagedKeyId syncedAt
+      hasStoredPassword credentialUsername passwordRevealCount
+      operations(sort: [{ createdAt: DESC }]) { id kind status createdAt finishedAt error }
+    }
+  }
+`);
+
+export const OperationsQuery = graphql(`
+  query Operations {
+    operations(sort: [{ createdAt: DESC }]) {
+      id kind status requestedBy createdAt confirmedAt finishedAt error
+      target { auraId name }
+      steps { seq status }
+    }
+  }
+`);
+
+export const AccountQuery = graphql(`
+  query Account {
+    auraSetup { required connected clientIdHint lastSyncAt syncing lastSyncRunId lastSyncStatus lastSyncError }
+    auraAccounts { id status clientIdHint connectedAt lastSyncAt }
+    instancesConnection { totalCount }
+    tenants(sort: [{ name: ASC }]) { auraId name configsSyncedAt configurationsConnection { totalCount } instancesConnection { totalCount } }
+    instanceConfigurationsConnection { totalCount }
+    syncRuns(sort: [{ startedAt: DESC }], limit: 5) { id status startedAt finishedAt tenants instances configurations requests retries error }
+  }
+`);

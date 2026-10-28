@@ -12,7 +12,8 @@
     "store",
     "aura",
     "mock-aura",
-    "gateway"
+    "gateway",
+    "web"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
