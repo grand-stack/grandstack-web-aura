@@ -125,7 +125,7 @@ Observed state is separate from intent. `Instance` is what Aura said; `Operation
 | `/instances/:id/edit` | Edit | Name, size, switches; asks for a plan |
 | `/operations` | Operations | Every change, with state filters |
 | `/operations/:id` | OperationPage | Review, then progress, then the result |
-| `/account` | Account | The connection, stored-copy counts, recent syncs, replace credentials, disconnect |
+| `/account` | Account | The connection, stored-copy counts, recent syncs, replace credentials, reset the stored copy, disconnect |
 
 Before an account is connected, the app shows only the connect form; after credentials are stored but before the first sync finishes, it shows the first-sync screen.
 

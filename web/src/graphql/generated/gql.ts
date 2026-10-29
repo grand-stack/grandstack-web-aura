@@ -18,6 +18,7 @@ type Documents = {
     "\n  mutation Connect($clientId: String!, $clientSecret: String!) {\n    connectAura(clientId: $clientId, clientSecret: $clientSecret) { connected syncRunId }\n  }\n": typeof types.ConnectDocument,
     "\n  mutation SyncNow { syncNow { started syncRunId } }\n": typeof types.SyncNowDocument,
     "\n  mutation Disconnect { disconnectAura }\n": typeof types.DisconnectDocument,
+    "\n  mutation ResetStore { resetStore { started syncRunId } }\n": typeof types.ResetStoreDocument,
     "\n  mutation PlanUpdate($instanceId: String!, $changes: InstanceChange!) {\n    planUpdate(instanceId: $instanceId, changes: $changes) { operationId }\n  }\n": typeof types.PlanUpdateDocument,
     "\n  mutation PlanPause($instanceId: String!) { planPause(instanceId: $instanceId) { operationId } }\n": typeof types.PlanPauseDocument,
     "\n  mutation PlanResume($instanceId: String!) { planResume(instanceId: $instanceId) { operationId } }\n": typeof types.PlanResumeDocument,
@@ -44,6 +45,7 @@ const documents: Documents = {
     "\n  mutation Connect($clientId: String!, $clientSecret: String!) {\n    connectAura(clientId: $clientId, clientSecret: $clientSecret) { connected syncRunId }\n  }\n": types.ConnectDocument,
     "\n  mutation SyncNow { syncNow { started syncRunId } }\n": types.SyncNowDocument,
     "\n  mutation Disconnect { disconnectAura }\n": types.DisconnectDocument,
+    "\n  mutation ResetStore { resetStore { started syncRunId } }\n": types.ResetStoreDocument,
     "\n  mutation PlanUpdate($instanceId: String!, $changes: InstanceChange!) {\n    planUpdate(instanceId: $instanceId, changes: $changes) { operationId }\n  }\n": types.PlanUpdateDocument,
     "\n  mutation PlanPause($instanceId: String!) { planPause(instanceId: $instanceId) { operationId } }\n": types.PlanPauseDocument,
     "\n  mutation PlanResume($instanceId: String!) { planResume(instanceId: $instanceId) { operationId } }\n": types.PlanResumeDocument,
@@ -96,6 +98,10 @@ export function graphql(source: "\n  mutation SyncNow { syncNow { started syncRu
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation Disconnect { disconnectAura }\n"): (typeof documents)["\n  mutation Disconnect { disconnectAura }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ResetStore { resetStore { started syncRunId } }\n"): (typeof documents)["\n  mutation ResetStore { resetStore { started syncRunId } }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

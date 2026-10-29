@@ -447,10 +447,10 @@ await shot("11-account-mobile");
 await open("/account", DESKTOP);
 await waitText("h1", "Aura account");
 await clickByText("button", "Disconnect from Aura");
-check("disconnecting asks first", await waitFor(() => document.querySelector("dialog.modal")?.open === true));
-check("the question says what is kept", await page.evaluate(() => document.querySelector("dialog.modal").textContent.includes("instances, stored passwords and history stay")));
+check("disconnecting asks first", await waitFor(() => !!document.querySelector("dialog.modal[open]")));
+check("the question says what is kept", await page.evaluate(() => document.querySelector("dialog.modal[open]").textContent.includes("instances, stored passwords and history stay")));
 await shot("12-disconnect-confirm");
-await page.evaluate(() => [...document.querySelectorAll("dialog.modal .btn-danger")][0].click());
+await page.evaluate(() => [...document.querySelectorAll("dialog.modal[open] .btn-danger")][0].click());
 check("after disconnecting the app asks to connect again", await waitText("h1", "Connect your Aura account"));
 const kept = await gql(`{ auraSetup { required connected } instancesConnection { totalCount } tenantsConnection { totalCount } }`);
 check("the stored copy is still there", kept.auraSetup.required === true && kept.instancesConnection.totalCount === 6 && kept.tenantsConnection.totalCount === 3, JSON.stringify(kept));
@@ -489,15 +489,23 @@ check("the cloud step offers only what the tenant is offered", (await radioCount
 await radio("cloud", "GCP");
 await clickByText("button", "Continue");
 await waitText("h1", "Where, and which tier?");
-check("the tier appears only once a region is chosen", (await radioCount("tier")) === 0);
-await page.evaluate(() => document.querySelector("input[name=region]").closest("label").click());
-check("the tiers offered in that region show", await waitFor(() => document.querySelectorAll("input[name=tier]").length >= 1));
-await radio("tier", "AuraDB Professional");
+// Region, tier and size are drop-downs: a first entry that says what to do, then the offered values
+const options = (id) => page.$$eval(`#${id} option`, (os) => os.filter((o) => o.value !== "").map((o) => ({ value: o.value, text: o.textContent.trim() })));
+const choose = async (id, textStart) => { const o = (await options(id)).find((x) => x.text.startsWith(textStart)); if (!o) return false; await page.select(`#${id}`, o.value); return true; };
+check("region and tier are drop-downs, not lists of buttons", (await count("select#region")) === 1 && (await count("select#tier")) === 1 && (await count("input[name=region], input[name=tier]")) === 0);
+check("the region drop-down offers the tenant's regions by name", (await options("region")).length >= 2 && (await options("region")).every((o) => /\(.+\)/.test(o.text)), JSON.stringify(await options("region")));
+check("the tier drop-down waits for a region", (await page.$eval("#tier", (e) => e.disabled)) && (await page.$eval("#tier", (e) => e.options[0].textContent)) === "Choose a region first");
+check("Continue is off until a region and a tier are chosen", await page.evaluate(() => [...document.querySelectorAll(".actionbar button")].find((b) => b.textContent === "Continue").disabled));
+await page.select("#region", (await options("region"))[0].value);
+check("the tiers offered in that region appear once it is chosen", await waitFor(() => !document.querySelector("#tier").disabled && document.querySelectorAll("#tier option").length >= 2));
+check("a tier is shown by its name", (await options("tier")).some((o) => o.text === "AuraDB Professional"), JSON.stringify(await options("tier")));
+await choose("tier", "AuraDB Professional");
 check("the choices so far can be changed", (await texts(".tagrow .tag")).length >= 1);
 await clickByText("button", "Continue");
-check("the size step offers memory and storage pairs", (await waitText("h1", "How big?")) && (await radioCount("size")) >= 2);
+check("the size step is a drop-down of memory and storage pairs", (await waitText("h1", "How big?")) && (await count("select#size")) === 1 && (await options("size")).length >= 2 && (await options("size")).every((o) => /memory, .* storage/.test(o.text)), JSON.stringify(await options("size")));
+check("Continue is off until a size is chosen", await page.evaluate(() => [...document.querySelectorAll(".actionbar button")].find((b) => b.textContent === "Continue").disabled));
 await shot("77-create-size-mobile");
-await page.evaluate(() => document.querySelector("input[name=size]").closest("label").click());
+await page.select("#size", (await options("size"))[0].value);
 await clickByText("button", "Continue");
 check("the last step asks for a name", await waitText("h1", "Name it"));
 check("Review is off until it has a name", await page.evaluate(() => [...document.querySelectorAll(".actionbar button")].find((b) => b.textContent === "Review").disabled));
@@ -580,6 +588,39 @@ check("the record stays, marked removed, and its password is gone", await until(
 await shot("83-delete-done-mobile");
 await open(`/instances/${made.auraId}`, DESKTOP);
 check("its page says it is gone and offers no actions", (await waitText(".banner-warn", "no longer in Aura")) && (await count(".actionbar")) === 0);
+
+// ───────────────────────────── 10c. Reset the stored copy ─────────────────────────────
+const snapshot = async () => {
+  const d = await gql(`{ tenantsConnection { totalCount } instanceConfigurationsConnection { totalCount } instancesConnection { totalCount } operationsConnection { totalCount } syncRunsConnection { totalCount } operations { id status target { auraId } } instances(where: { deletedInAuraAt: { startsWith: "2" } }) { auraId } }`);
+  return { tenants: d.tenantsConnection.totalCount, options: d.instanceConfigurationsConnection.totalCount, instances: d.instancesConnection.totalCount, operations: d.operationsConnection.totalCount, runs: d.syncRunsConnection.totalCount, linked: d.operations.filter((o) => o.target.length > 0).length, statuses: d.operations.map((o) => `${o.id}:${o.status}`).sort(), removed: d.instances.length };
+};
+const beforeReset = await snapshot();
+check("(arrange) there are operations to keep, some linked to instances, and a removed instance", beforeReset.operations >= 5 && beforeReset.linked >= 3 && beforeReset.removed >= 1, JSON.stringify(beforeReset));
+await open("/account", DESKTOP);
+await waitText("h1", "Aura account");
+check("the account page offers to reset the stored copy, and says what is kept", (await count("button.btn")) > 0 && (await waitText(".panel .note", "Keeps your credentials, past changes and stored passwords")));
+await clickByText("button", "Reset the stored copy");
+check("resetting asks first, and says what goes and what stays", (await waitFor(() => !!document.querySelector("dialog.modal[open]"))) && (await page.evaluate(() => document.querySelector("dialog.modal[open]").textContent.includes("Kept:") && /credentials/.test(document.querySelector("dialog.modal[open]").textContent))));
+await shot("84-reset-confirm");
+await clickByText("dialog.modal[open] button", "Cancel");
+check("cancelling removes nothing", (await snapshot()).instances === beforeReset.instances);
+// Wait for the dialog to finish closing, and for the button to be usable, before opening it again
+await waitFor(() => !document.querySelector("dialog.modal[open]"));
+await waitFor(() => [...document.querySelectorAll("button")].some((b) => b.textContent.startsWith("Reset the stored copy") && !b.disabled));
+await clickByText("button", "Reset the stored copy");
+await waitFor(() => !!document.querySelector("dialog.modal[open]"));
+await page.evaluate(() => [...document.querySelectorAll("dialog.modal[open] button")].find((b) => b.textContent.includes("Reset and read again")).click());
+check("the store is read in again", await until(async () => { const n = await snapshot(); return n.runs === beforeReset.runs + 1 && n.tenants === beforeReset.tenants && n.options === beforeReset.options && n.instances === beforeReset.instances && (await gql(`{ auraSetup { syncing lastSyncStatus } }`)).auraSetup.syncing === false; }, 60000));
+const afterReset = await snapshot();
+check("every past operation is kept, with the same outcome, and a sync run was added", afterReset.operations === beforeReset.operations && JSON.stringify(afterReset.statuses) === JSON.stringify(beforeReset.statuses) && afterReset.runs === beforeReset.runs + 1, JSON.stringify(afterReset));
+check("operations are linked to their instances again", afterReset.linked === beforeReset.linked, `${afterReset.linked} vs ${beforeReset.linked}`);
+check("the instance Aura no longer lists is still there as a record", afterReset.removed === beforeReset.removed);
+check("the connection was kept: no need to connect again", (await gql(`{ auraSetup { required connected } }`)).auraSetup.required === false);
+await open("/operations", DESKTOP);
+check("the Operations page shows the same history", await waitFor((n) => document.querySelectorAll(".listrow a[href^='/operations/']").length >= n, beforeReset.operations));
+await open("/account", DESKTOP);
+await waitText("h1", "Aura account");
+await shot("85-account-after-reset");
 
 // ───────────────────────────── 11. Theme ─────────────────────────────
 await open("/", DESKTOP);

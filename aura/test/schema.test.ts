@@ -44,6 +44,17 @@ describe("mutations", () => {
     expect((await running.run(`mutation { syncNow { started syncRunId } }`)).data.syncNow).toEqual({ started: false, syncRunId: "run-9" });
   });
 
+  it("resets the store, and says whether a sync was started", async () => {
+    const { run, calls } = fake({ resetStore: async () => (calls.push({ method: "reset", args: [] }), { started: true, runId: "run-7", removed: { tenants: 3, options: 48, instances: 6 } }) });
+    expect((await run(`mutation { resetStore { started syncRunId } }`)).data.resetStore).toEqual({ started: true, syncRunId: "run-7" });
+    expect(calls).toEqual([{ method: "reset", args: [] }]);
+  });
+
+  it("shows the person why a reset was refused", async () => {
+    const { run } = fake({ resetStore: async () => { throw new UserError("A sync is running. Wait for it to finish, then reset the store."); } });
+    expect((await run(`mutation { resetStore { started } }`)).errors![0]!.message).toMatch(/A sync is running/);
+  });
+
   it("disconnects", async () => {
     const { run, calls } = fake();
     expect((await run(`mutation { disconnectAura }`)).data.disconnectAura).toBe(true);

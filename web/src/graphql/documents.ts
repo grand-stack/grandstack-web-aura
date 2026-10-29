@@ -24,6 +24,11 @@ export const DisconnectMutation = graphql(`
   mutation Disconnect { disconnectAura }
 `);
 
+// Removes what came from Aura (tenants, options, instances) and reads it again. Keeps the credentials, past changes and stored passwords.
+export const ResetStoreMutation = graphql(`
+  mutation ResetStore { resetStore { started syncRunId } }
+`);
+
 export const PlanUpdateMutation = graphql(`
   mutation PlanUpdate($instanceId: String!, $changes: InstanceChange!) {
     planUpdate(instanceId: $instanceId, changes: $changes) { operationId }

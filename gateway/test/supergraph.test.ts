@@ -23,7 +23,7 @@ describe("the composed supergraph", () => {
 
   it("can only be changed through the aura subgraph's mutations, which plan, confirm and cancel", () => {
     // The store's public subgraph is read-only, so none of its generated create, update or delete mutations can appear
-    expect(names("Mutation").sort()).toEqual(["cancelOperation", "confirmOperation", "connectAura", "disconnectAura", "planCreate", "planDelete", "planPause", "planResume", "planUpdate", "revealInstancePassword", "syncNow"]);
+    expect(names("Mutation").sort()).toEqual(["cancelOperation", "confirmOperation", "connectAura", "disconnectAura", "planCreate", "planDelete", "planPause", "planResume", "planUpdate", "resetStore", "revealInstancePassword", "syncNow"]);
   });
 
   it("has no mutation that writes an operation or an instance directly, so a change has to be confirmed to reach Aura", () => {

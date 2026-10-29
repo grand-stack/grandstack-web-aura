@@ -42,6 +42,7 @@ They cover, among other things (`aura/test/integration/`):
 
 - **Plan, confirm, progress** (`operations.test.ts`): nothing reaches Aura before a confirm, a double confirm sends once, a stale plan is refused, a refusal from Aura fails the change with its reason, a lost answer is never sent again, a timeout, and restart recovery for each state a crash can leave.
 - **Create, delete, passwords** (`lifecycle.test.ts`): a create stores the sealed password and links it; a lost answer is not retried; a delete needs the typed name and finishes only on a 404; a reveal is counted and audited and cannot happen unrecorded; a value copied onto another instance will not open; drift is reported without changing the stored copy.
+- **Reset** (`reset.test.ts`): the tenants, options and instances come back as they were; the credentials, past operations (relinked to their instances), stored passwords (still showable), removed-instance records and sync history are kept; Aura is not changed; refused without an account, during a sync and during a change; and a reset cut short is repaired by the next sync.
 - **Secrets** (`secrets.test.ts`, `service.test.ts`): the client secret and passwords appear nowhere in the database, a log or an error.
 - **Sync** (`sync.test.ts`): idempotent, tags move, a removed instance is marked once, a failed run keeps what was there.
 
@@ -59,7 +60,7 @@ It checks that every path asks for a sign-in, that a wrong user, wrong password,
 
 ## 7. Browser end-to-end checks
 
-`npm run e2e -w web` drives a real Chrome through the whole flow and checks 201 behaviours: connect (first with a wrong secret), the gallery, filters, search, sync after something changed in Aura, edit, review, confirm and follow progress, pause and resume, a change Aura refuses, a stale plan, create with the stepper, the password behind the eye, check with Aura, delete with the name typed, the account page, disconnect and reconnect, and the theme. It runs on a phone-sized screen and a desktop-sized one and checks that nothing scrolls sideways, that every control has a name a screen reader can read, that each page has one heading, and that the browser logged no errors (under the strict content security policy, so a violation fails it).
+`npm run e2e -w web` drives a real Chrome through the whole flow and checks 216 behaviours: connect (first with a wrong secret), the gallery, filters, search, sync after something changed in Aura, edit, review, confirm and follow progress, pause and resume, a change Aura refuses, a stale plan, create with the stepper, the password behind the eye, check with Aura, delete with the name typed, the account page, disconnect and reconnect, reset the stored copy (cancel, then reset, and the history, links and connection survive), and the theme. It runs on a phone-sized screen and a desktop-sized one and checks that nothing scrolls sideways, that every control has a name a screen reader can read, that each page has one heading, and that the browser logged no errors (under the strict content security policy, so a violation fails it).
 
 ```sh
 # from the grandstack folder, on a fresh stack (down -v first: it must have no account connected)

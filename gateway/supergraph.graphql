@@ -305,6 +305,12 @@ type Mutation @join__type(graph: AURA)  {
   """
   syncNow: SyncStart!
   """
+  Remove what came from Aura (tenants, their instance options, instances) from the store and read it in again. Kept: the Aura
+  credentials, past changes and their steps, stored instance passwords, and sync history. Nothing changes in Aura. Refused while a sync
+  or a change is under way.
+  """
+  resetStore: SyncStart!
+  """
   Delete the stored client secret and stop syncing. Instances, stored passwords and history are kept, and nothing changes in
   Aura. Connect again to resume.
   """

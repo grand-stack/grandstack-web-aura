@@ -2,7 +2,7 @@
 // Neo4j Sweden AB [http://neo4j.com]
 import { useState } from "react";
 import { useMutation, useQuery } from "urql";
-import { AccountQuery, DisconnectMutation } from "../graphql/documents";
+import { AccountQuery, DisconnectMutation, ResetStoreMutation } from "../graphql/documents";
 import { errorMessage, useApp, useNow, useRefreshOnSync, useTitle } from "../hooks";
 import { formatDate, plural, relativeTime } from "../lib/format";
 import { Banner, Button, Skeleton, StatusChip } from "../ui";
@@ -28,8 +28,23 @@ export function Account() {
   const [confirming, setConfirming] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string>();
   const [{ fetching: disconnecting }, disconnect] = useMutation(DisconnectMutation);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string>();
+  const [{ fetching: resetBusy }, resetStore] = useMutation(ResetStoreMutation);
 
   const account = data?.auraAccounts[0];
+
+  /** Empties what came from Aura and reads it again. The app then shows the first-sync screen until the new read finishes. */
+  async function confirmReset() {
+    setResetError(undefined);
+    const result = await resetStore({});
+    setResetting(false);
+    if (result.error) {
+      setResetError(errorMessage(result.error));
+      return;
+    }
+    refetchSetup();
+  }
 
   async function confirmDisconnect() {
     const result = await disconnect({});
@@ -90,6 +105,11 @@ export function Account() {
                 <Icon name="sync" size={18} className={syncing ? "spinner" : undefined} />{syncing ? "Syncing…" : "Sync now"}
               </Button>
             </div>
+            <div style={{ padding: "0 12px 12px" }}>
+              <Button block onClick={() => setResetting(true)} disabled={syncing}>Reset the stored copy…</Button>
+              <p className="note" style={{ padding: "8px 0 0" }}>Removes what came from Aura and reads it in again. Keeps your credentials, past changes and stored passwords.</p>
+              {resetError && <div style={{ marginTop: 8 }}><Banner tone="danger">{resetError}</Banner></div>}
+            </div>
           </section>
 
           <section className="panel" aria-labelledby="runs-title">
@@ -123,6 +143,12 @@ export function Account() {
           </section>
         </div>
       </div>
+
+      <ConfirmDialog open={resetting} title="Reset the stored copy?" confirmLabel="Reset and read again" busy={resetBusy} onCancel={() => setResetting(false)} onConfirm={() => void confirmReset()}>
+        <p>This removes the tenants, instance options and instances that this app copied from Aura, then reads them in again. It takes a few seconds, and the app shows its first-read screen meanwhile.</p>
+        <p style={{ marginTop: 8 }}><strong>Kept:</strong> your Aura credentials, every past change and its steps, the passwords stored for instances made here, and the sync history. Nothing changes in Aura.</p>
+        <p className="muted" style={{ marginTop: 8 }}>It is refused while a sync or a change is under way.</p>
+      </ConfirmDialog>
 
       <ConfirmDialog open={confirming} title="Disconnect from Aura?" confirmLabel="Disconnect" busy={disconnecting} onCancel={() => setConfirming(false)} onConfirm={() => void confirmDisconnect()}>
         <p>The stored client secret will be deleted and syncing will stop. Your instances, stored passwords and history stay. Nothing changes in Aura.</p>
