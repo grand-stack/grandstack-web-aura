@@ -19,9 +19,8 @@ concurrency:
 
 env:
   NODE_VERSION: "24.22.1"
-  # The branch of grandstack, grandstack-server and grandstack-federation that has the Aura setup (MODEL and READ_ONLY in the server,
-  # compose.aura.yaml in grandstack). Change this to main once those are merged.
-  SIBLING_REF: aura-model
+  # The branch of grandstack, grandstack-server and grandstack-federation to test against (the Aura setup: MODEL and READ_ONLY in the server, compose.aura.yaml in grandstack).
+  SIBLING_REF: main
 
 jobs:
   test:
