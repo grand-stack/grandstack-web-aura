@@ -14,6 +14,8 @@ updates:
       - dependency-name: "graphql"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@apollo/subgraph"
+      - dependency-name: "graphql-yoga"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: "/aura"
     schedule: { interval: weekly }
