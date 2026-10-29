@@ -305,7 +305,7 @@ type Mutation @join__type(graph: AURA)  {
   """
   syncNow: SyncStart!
   """
-  Remove what came from Aura (tenants, their instance options, instances) from the store and read it in again. Kept: the Aura
+  Remove what came from Aura (tenants, their instance options, every instance) from the store and read it in again. Kept: the Aura
   credentials, past changes and their steps, stored instance passwords, and sync history. Nothing changes in Aura. Refused while a sync
   or a change is under way.
   """
