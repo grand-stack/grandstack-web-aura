@@ -157,7 +157,7 @@ export const DetailQuery = graphql(`
 export const OperationQuery = graphql(`
   query Operation($id: ID!) {
     operations(where: { id: { eq: $id } }) {
-      id kind status error diff requestedBy createdAt confirmedAt finishedAt
+      id kind status error diff before requestedBy createdAt confirmedAt finishedAt
       target { auraId name }
       steps(sort: [{ seq: ASC }]) { seq label status detail at }
     }
@@ -187,7 +187,7 @@ export const SizeOptionsQuery = graphql(`
 export const OperationsQuery = graphql(`
   query Operations {
     operations(sort: [{ createdAt: DESC }]) {
-      id kind status requestedBy createdAt confirmedAt finishedAt error
+      id kind status requestedBy createdAt confirmedAt finishedAt error diff before
       target { auraId name }
       steps { seq status }
     }

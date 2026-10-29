@@ -592,10 +592,11 @@ check("its page says it is gone and offers no actions", (await waitText(".banner
 // ───────────────────────────── 10c. Reset the stored copy ─────────────────────────────
 const snapshot = async () => {
   const d = await gql(`{ tenantsConnection { totalCount } instanceConfigurationsConnection { totalCount } instancesConnection { totalCount } operationsConnection { totalCount } syncRunsConnection { totalCount } operations { id status target { auraId } } instances(where: { deletedInAuraAt: { startsWith: "2" } }) { auraId } }`);
-  return { tenants: d.tenantsConnection.totalCount, options: d.instanceConfigurationsConnection.totalCount, instances: d.instancesConnection.totalCount, operations: d.operationsConnection.totalCount, runs: d.syncRunsConnection.totalCount, linked: d.operations.filter((o) => o.target.length > 0).length, statuses: d.operations.map((o) => `${o.id}:${o.status}`).sort(), removed: d.instances.length };
+  const removedIds = new Set(d.instances.map((i) => i.auraId));
+  return { tenants: d.tenantsConnection.totalCount, options: d.instanceConfigurationsConnection.totalCount, instances: d.instancesConnection.totalCount, operations: d.operationsConnection.totalCount, runs: d.syncRunsConnection.totalCount, linked: d.operations.filter((o) => o.target.length > 0).length, linkedToListed: d.operations.filter((o) => o.target.length > 0 && !removedIds.has(o.target[0].auraId)).length, statuses: d.operations.map((o) => `${o.id}:${o.status}`).sort(), removed: d.instances.length };
 };
 const beforeReset = await snapshot();
-check("(arrange) there are operations to keep, some linked to instances, and a removed instance", beforeReset.operations >= 5 && beforeReset.linked >= 3 && beforeReset.removed >= 1, JSON.stringify(beforeReset));
+check("(arrange) there are operations to keep, some linked to instances, and an instance Aura no longer lists", beforeReset.operations >= 5 && beforeReset.linkedToListed >= 3 && beforeReset.removed >= 1, JSON.stringify(beforeReset));
 await open("/account", DESKTOP);
 await waitText("h1", "Aura account");
 check("the account page offers to reset the stored copy, and says what is kept", (await count("button.btn")) > 0 && (await waitText(".panel .note", "Keeps your credentials, past changes and stored passwords")));
@@ -610,13 +611,14 @@ await waitFor(() => [...document.querySelectorAll("button")].some((b) => b.textC
 await clickByText("button", "Reset the stored copy");
 await waitFor(() => !!document.querySelector("dialog.modal[open]"));
 await page.evaluate(() => [...document.querySelectorAll("dialog.modal[open] button")].find((b) => b.textContent.includes("Reset and read again")).click());
-check("the store is read in again", await until(async () => { const n = await snapshot(); return n.runs === beforeReset.runs + 1 && n.tenants === beforeReset.tenants && n.options === beforeReset.options && n.instances === beforeReset.instances && (await gql(`{ auraSetup { syncing lastSyncStatus } }`)).auraSetup.syncing === false; }, 60000));
+check("the store is read in again", await until(async () => { const n = await snapshot(); return n.runs === beforeReset.runs + 1 && n.tenants === beforeReset.tenants && n.options === beforeReset.options && n.instances === beforeReset.instances - beforeReset.removed && (await gql(`{ auraSetup { syncing lastSyncStatus } }`)).auraSetup.syncing === false; }, 60000));
 const afterReset = await snapshot();
 check("every past operation is kept, with the same outcome, and a sync run was added", afterReset.operations === beforeReset.operations && JSON.stringify(afterReset.statuses) === JSON.stringify(beforeReset.statuses) && afterReset.runs === beforeReset.runs + 1, JSON.stringify(afterReset));
-check("operations are linked to their instances again", afterReset.linked === beforeReset.linked, `${afterReset.linked} vs ${beforeReset.linked}`);
-check("the instance Aura no longer lists is still there as a record", afterReset.removed === beforeReset.removed);
+check("operations on instances Aura still lists are linked to them again", afterReset.linked === beforeReset.linkedToListed, `${afterReset.linked} vs ${beforeReset.linkedToListed}`);
+check("an instance Aura no longer lists is removed too, so leftovers do not stay", afterReset.removed === 0 && afterReset.instances === beforeReset.instances - beforeReset.removed, JSON.stringify([afterReset.instances, beforeReset.instances, beforeReset.removed]));
 check("the connection was kept: no need to connect again", (await gql(`{ auraSetup { required connected } }`)).auraSetup.required === false);
 await open("/operations", DESKTOP);
+check("operations on an instance that is gone still say which one, after the reset", (await waitText(".listrow .title", `Delete ${NAME}`)) && (await waitText(".listrow .title", `Create ${NAME}`)), (await texts(".listrow .title")).slice(0, 6).join("|"));
 check("the Operations page shows the same history", await waitFor((n) => document.querySelectorAll(".listrow a[href^='/operations/']").length >= n, beforeReset.operations));
 await open("/account", DESKTOP);
 await waitText("h1", "Aura account");

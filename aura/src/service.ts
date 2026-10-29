@@ -160,7 +160,7 @@ export class AuraService {
   }
 
   /**
-   * Removes what came from Aura (the tenants, their instance options and the instances Aura lists) and reads it in again. The Aura
+   * Removes what came from Aura (the tenants, their instance options and every instance) and reads it in again. The Aura
    * credentials, past operations, stored passwords and sync history are kept (see `SecretStore.clearAuraCopy`). Nothing changes in Aura.
    * Refused while a sync or a change is under way, because both would be working on what is being removed.
    */

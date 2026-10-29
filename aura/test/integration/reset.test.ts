@@ -105,7 +105,7 @@ suite("resetting the store", () => {
     expect(await svc.revealPassword(id)).toEqual({ username: "neo4j", password });
   });
 
-  it("keeps an instance Aura no longer lists, as a record, with its tenant and history", async () => {
+  it("removes an instance Aura no longer lists too, and keeps its operations, which then point at nothing but still say what they were about", async () => {
     const svc = await ready();
     const { operationId } = await svc.operations.planDelete(ORDERS);
     await svc.operations.confirm(operationId, "orders-prod");
@@ -113,9 +113,12 @@ suite("resetting the store", () => {
     expect(await instance(ORDERS)).toMatchObject({ deletedInAuraAt: expect.any(String) });
     await svc.resetStore();
     await svc.idle();
-    expect(await instance(ORDERS)).toMatchObject({ name: "orders-prod", deletedInAuraAt: expect.any(String), tenant: [{ name: "Acme Production" }], operations: [{ id: operationId, kind: "DELETE", status: "SUCCEEDED" }] });
-    // Aura does not list it, so the store has it once, not twice
-    expect(total(await counts(), "instancesConnection")).toBe(6);
+    // Aura does not list it, so the sync does not make it again
+    expect(await instance(ORDERS)).toBeUndefined();
+    expect(total(await counts(), "instancesConnection")).toBe(5);
+    const kept = (await w.read(`query($id: ID!) { operations(where: { id: { eq: $id } }) { kind status before target { auraId } } }`, { id: operationId })).operations[0];
+    expect(kept).toMatchObject({ kind: "DELETE", status: "SUCCEEDED", target: [] });
+    expect(JSON.parse(kept.before)).toMatchObject({ name: "orders-prod" });
   });
 
   it("keeps sync history and adds the new run", async () => {

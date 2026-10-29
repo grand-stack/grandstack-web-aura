@@ -1,7 +1,7 @@
 // Copyright (c) "Neo4j"
 // Neo4j Sweden AB [http://neo4j.com]
 import { describe, expect, it } from "vitest";
-import { duration, kindLabel, matchesOperationFilter, operationView } from "./operations";
+import { duration, kindLabel, matchesOperationFilter, operationSubject, operationView } from "./operations";
 
 const STATUSES = ["PLANNED", "CONFIRMED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"] as const;
 
@@ -44,3 +44,21 @@ describe("duration", () => {
     expect(duration("nope", "nope")).toBe("");
   });
 });
+
+describe("operationSubject", () => {
+  const named = (name: string) => [{ name }];
+  it("is the instance the operation points at", () => {
+    expect(operationSubject({ target: named("orders-prod"), before: JSON.stringify({ name: "older-name" }) })).toBe("orders-prod");
+  });
+  it("is the instance as it was when planned, once the instance is gone", () => {
+    expect(operationSubject({ target: [], before: JSON.stringify({ name: "orders-prod", status: "running" }) })).toBe("orders-prod");
+  });
+  it("is the name that was asked for, for a create that has no instance", () => {
+    const diff = JSON.stringify({ items: [{ field: "tenant", after: "Acme" }, { field: "name", before: "", after: "new-one" }], warnings: [] });
+    expect(operationSubject({ target: [], before: "{}", diff })).toBe("new-one");
+  });
+  it.each([[null], [undefined], [""], ["not json"], ["{}"], [JSON.stringify({ name: 3 })]])("falls back to a plain phrase for %s", (before) => {
+    expect(operationSubject({ target: [], before: before as string, diff: null })).toBe("an instance");
+  });
+});
+

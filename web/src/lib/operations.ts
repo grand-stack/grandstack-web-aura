@@ -46,3 +46,22 @@ export function duration(startIso?: string | null, endIso?: string | null): stri
   if (minutes < 60) return `${minutes} min`;
   return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
 }
+
+/**
+ * What to call the instance an operation was about. Normally that is the instance it points at. After the stored copy is reset, an
+ * operation on an instance Aura no longer has points at nothing, so the name is read from the operation itself: the instance as it was
+ * when the change was planned, or, for a create, the name that was asked for.
+ */
+export function operationSubject(op: { target: readonly { name: string }[]; before?: string | null; diff?: string | null }): string {
+  const linked = op.target[0]?.name;
+  if (linked) return linked;
+  const named = (json: string | null | undefined, pick: (v: any) => unknown): string | undefined => {
+    try {
+      const value = pick(JSON.parse(json ?? ""));
+      return typeof value === "string" && value !== "" ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  return named(op.before, (b) => b?.name) ?? named(op.diff, (d) => d?.items?.find((i: { field?: string }) => i?.field === "name")?.after) ?? "an instance";
+}
