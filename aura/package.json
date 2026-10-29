@@ -20,7 +20,7 @@
   "dependencies": {
     "@apollo/subgraph": "2.14.4",
     "graphql": "16.14.2",
-    "graphql-yoga": "5.24.6",
+    "graphql-yoga": "6.0.1",
     "neo4j-driver": "6.2.0"
   },
   "devDependencies": {
