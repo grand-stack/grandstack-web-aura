@@ -3,7 +3,7 @@
 # Neo4j Sweden AB [http://neo4j.com]
 # Makes everything the Aura setup needs before its first start, and nothing it already has:
 #   .env             in the grandstack repository (beside this one), where compose reads it: the key that seals secrets (SECRET_KEY)
-#                    and the database password if there is none. Set ENV_FILE to write somewhere else.
+#                    (the database password is left at the grandstack default). Set ENV_FILE to write somewhere else.
 # With --edge (needed for compose.edge.yaml, which puts TLS and a sign-in in front of the app):
 #   edge/secrets/    who may sign in (htpasswd, one user, bcrypt hash) and a self-signed certificate for localhost, to be replaced by
 #                    a real one anywhere else. The directory is private to you; the files are readable so the container's user can read
@@ -48,8 +48,8 @@ ensure() { # name, value-generator
   fi
 }
 ensure SECRET_KEY "openssl rand -base64 32"
-# The grandstack default (grandstack-dev) is kept if .env.example was copied; only a missing one is generated
-grep -qE "^NEO4J_PASSWORD=.+" "$ENV_FILE" || ensure NEO4J_PASSWORD "random 32"
+# The database password is left alone: the grandstack compose file's Neo4j health check only knows the default (grandstack-dev), so a
+# different NEO4J_PASSWORD would make Neo4j look unhealthy. Set one yourself only if you also change that health check.
 
 if [ "$edge" = false ]; then
   echo "ready: $ENV_FILE. Start with, in the grandstack folder: docker compose -f compose.yaml -f compose.aura.yaml up --build   (run this again with --edge first to put TLS and a sign-in in front)"
