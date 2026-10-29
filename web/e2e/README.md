@@ -4,7 +4,7 @@
 
 ## Run it
 
-1. Start a **fresh** stack from the `grandstack` folder: `docker compose -f compose.yaml -f compose.aura.yaml down -v`, then `up -d --build` with the same files (run `scripts/init-env.sh` here first if you have not). The fake Aura must be the one the stack uses (the default), and its port (4020) must be published, which the edge overlay prevents: the run changes the fake directly, so it runs on the plain setup.
+1. Start a **fresh** stack with the **fake Aura** from the `grandstack` folder: `docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-mock.yaml down -v`, then `up -d --build` with the same files (run `scripts/init-env.sh` here first if you have not). The run stops at once if the fake is not there (it never goes near a real account), and its port (4020) must be published, which the edge overlay prevents: the run changes the fake directly, so it runs on the plain setup.
 2. `npm ci` once.
 3. `npm run e2e -w web`
 

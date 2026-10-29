@@ -43,7 +43,7 @@ Working with a coding agent? Start with [AGENTS.md](AGENTS.md).
 
 ## Run it
 
-The stack points at mock-aura by default, so no real Aura account is touched. Docker works as well as podman. Clone the repositories **side by side into one folder**, as for any GRANDstack setup (the compose files build the others from their sibling folders):
+**It talks to your real Aura account**, with the client ID and secret you enter in the app: a change you confirm changes your account, and a delete cannot be undone (each change is reviewed first, and a delete needs the name typed). To try it without a real account, use the fake Aura, which is for development and tests ([below](#the-fake-aura-for-testing)). Docker works as well as podman. Clone the repositories **side by side into one folder**, as for any GRANDstack setup (the compose files build the others from their sibling folders):
 
 ```sh
 mkdir grand-stack && cd grand-stack
@@ -56,11 +56,10 @@ docker compose -f compose.yaml -f compose.aura.yaml up --build
 
 | Open | To see |
 | --- | --- |
-| http://localhost:3000 | **The app.** The first screen asks for the Aura client ID and secret (for the fake Aura use `mock-client` and `mock-secret`) |
+| http://localhost:3000 | **The app.** The first screen asks for your Aura client ID and secret (from the Aura Console; read [docs/real-account-checklist.md](docs/real-account-checklist.md) first) |
 | http://localhost:4000/graphql | The gateway: the one GraphQL endpoint (the app reaches it through its own web server) |
 | http://localhost:4001/graphql | The read-only server, for development and for `npm run compose:supergraph` |
 | http://localhost:4010/graphql | The Aura subgraph |
-| http://localhost:4020/v1 | mock-aura. Credentials `mock-client` / `mock-secret` |
 | http://localhost:7474 | Neo4j Browser (user `neo4j`, password from `.env`, default `grandstack-dev`) |
 
 **By default the app is plain HTTP with no sign-in, and everything is published on this machine only** (`127.0.0.1`). That is fine for you on your own laptop and not for anything else: whoever can open the page can create and delete instances. The writable server publishes no port and is on a private network with Neo4j and the Aura subgraph. It replaces the other GRANDstack setups on ports 3000 and 4000, and uses its own Neo4j volume, so Movies and Aura data never mix. `docker compose ... down -v` deletes the Aura data and the stored (sealed) secrets.
@@ -86,14 +85,22 @@ docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-edge.yaml up
 
 Read [docs/deploying.md](docs/deploying.md) before doing that: it says what the sign-in does and does not protect.
 
+### The fake Aura, for testing
+
+`mock-aura` is a stand-in for the Aura API, checked against Aura's own OpenAPI file, with 3 tenants and 6 instances. It is for development and tests only: the browser checks and the integration tests run against it, and it can be told to refuse a change or drop an answer, which the real Aura cannot. It is **not** part of the default setup. Add its overlay to use it:
+
+```sh
+docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-mock.yaml up --build
+```
+
+Connect with the client ID `mock-client` and the secret `mock-secret`. The overlay fixes the Aura address to the fake, whatever `AURA_BASE_URL` says in `.env`, so a test can never reach the real one. Its API is on http://localhost:4020/v1 (this machine only).
+
 ### Trying the API
 
 ```sh
-curl -s localhost:4000/graphql -H 'content-type: application/json' -d '{"query":"mutation { connectAura(clientId: \"mock-client\", clientSecret: \"mock-secret\") { connected syncRunId } }"}'
+curl -s localhost:4000/graphql -H 'content-type: application/json' -d '{"query":"{ auraSetup { required connected lastSyncStatus } }"}'
 curl -s localhost:4000/graphql -H 'content-type: application/json' -d '{"query":"{ auraSetup { connected lastSyncStatus } instances { name statusGroup tenant { name } cloud { name } } }"}'
 ```
-
-To use a real Aura account, set `AURA_BASE_URL=https://api.neo4j.io` in `grandstack/.env` and use a client id and secret from the Aura Console. Do that only after reading [docs/real-account-checklist.md](docs/real-account-checklist.md).
 
 ### The Aura subgraph's settings
 
@@ -101,7 +108,7 @@ To use a real Aura account, set `AURA_BASE_URL=https://api.neo4j.io` in `grandst
 | --- | --- | --- |
 | `SECRET_KEY` | required | 32 bytes, base64. Seals the client secret and instance passwords |
 | `SECRET_KEY_VERSION` | `1` | Which key sealed a value, for rotation |
-| `AURA_BASE_URL` | the fake Aura | `https://api.neo4j.io` for a real account. Must be https, unless `ALLOW_INSECURE_AURA_URL=true` (for mock-aura) |
+| `AURA_BASE_URL` | `https://api.neo4j.io` | The Aura API. Must be https, unless `ALLOW_INSECURE_AURA_URL=true`, which only the fake-Aura overlay sets |
 | `SYNC_INTERVAL_MS` | `900000` | Time between automatic syncs. `0` turns the timer off |
 | `SYNC_CONCURRENCY` | `3` | Instance detail requests in flight at once |
 | `STORE_WRITER_URL` | `http://store-writer:4000/graphql` | The writable server |
@@ -125,13 +132,13 @@ podman run -d --rm --name gwa-neo4j-test -p 7688:7687 -e NEO4J_AUTH=neo4j/gwa-te
 NEO4J_TEST_URI=bolt://localhost:7688 NEO4J_TEST_PASSWORD=gwa-test-password npm test
 ```
 
-To check the web app in a real browser (needs Chrome and a fresh stack), see [web/e2e/README.md](web/e2e/README.md): `BASE_URL=http://localhost:3000 npm run e2e -w web` (add `BASE_URL=https://localhost:8443 E2E_PASSWORD=...` to run through the edge). To check what the edge promises (sign-in, headers, closed ports): `EDGE_PASSWORD=... node edge/check.mjs`.
+To check the web app in a real browser (needs Chrome and a fresh stack), see [web/e2e/README.md](web/e2e/README.md): `BASE_URL=http://localhost:3000 npm run e2e -w web` (on the setup with the fake Aura) (add `BASE_URL=https://localhost:8443 E2E_PASSWORD=...` to run through the edge). To check what the edge promises (sign-in, headers, closed ports): `EDGE_PASSWORD=... node edge/check.mjs`.
 
 After a change to a subgraph's schema, start the stack, recompose the supergraph (`npm run compose:supergraph`) and commit it.
 
 ## Safety notes
 
-- Never point development or tests at a real Aura account. Creates and deletes cost money and cannot be undone. Use mock-aura.
+- The default setup talks to the real Aura API. Never point development or tests at a real account: creates and deletes cost money and cannot be undone. Tests use the fake Aura (`compose.aura-mock.yaml`), whose address cannot be changed by `.env`.
 - By default the app is plain HTTP with no sign-in, on loopback. With the edge (`compose.aura-edge.yaml`) everything is behind TLS and a sign-in and nothing else is published. Either way the gateway, servers and database have no sign-in of their own.
 - The writable server can change anything. It is on a private network with Neo4j and the Aura subgraph only, publishes no port, and must never be routed through the gateway.
 - The Aura client secret and instance passwords are never GraphQL fields and are stored only as ciphertext. See PLAN.md section 6.

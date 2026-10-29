@@ -43,10 +43,10 @@ What to change to make this look and behave like your own app, what each setting
 | --- | --- | --- |
 | `SECRET_KEY` | required | 32 bytes, base64. Seals the client secret and instance passwords. Losing it means they cannot be opened. `scripts/init-env.sh` makes it. |
 | `NEO4J_PASSWORD` | `grandstack-dev` | The database password, as in every GRANDstack setup. |
-| `AURA_BASE_URL` | the fake Aura | `https://api.neo4j.io` for a real account. |
-| `ALLOW_INSECURE_AURA_URL` | `true` | Lets `AURA_BASE_URL` be plain http, for mock-aura. It has no effect on an https address. |
+| `AURA_BASE_URL` | `https://api.neo4j.io` | The Aura API. The fake-Aura overlay fixes it to the fake. |
+| `ALLOW_INSECURE_AURA_URL` | unset | Lets `AURA_BASE_URL` be plain http. Only the fake-Aura overlay (`compose.aura-mock.yaml`) sets it. |
 | `SYNC_INTERVAL_MS` | `900000` | Time between automatic syncs. `0` turns the timer off. |
-| `MOCK_STEP_MS` | `3000` | How long each asynchronous step takes in mock-aura. |
+| `MOCK_STEP_MS` | `3000` | How long each asynchronous step takes in mock-aura (the fake-Aura overlay only). |
 | `EDGE_BIND`, `EDGE_PORT` | `127.0.0.1`, `8443` | Where the edge is published (`compose.aura-edge.yaml`). `0.0.0.0` serves other machines. |
 | `EDGE_REQUEST_RATE`, `EDGE_MUTATION_RATE` | `20r/s`, `60r/m` | Per address. Mutations are POSTs; reads are GETs and are not held to the minute. |
 | `EDGE_HSTS` | empty | For example `max-age=31536000`, once there is a real hostname and certificate. It applies to a whole host, whatever the port. |
@@ -74,9 +74,9 @@ Both run the same image with `MODEL=aura`, `MODELS_DIR=/app/models` (this reposi
 
 `VITE_GRAPHQL_URL` is fixed at **build time** and empty, which means `/graphql` on the app's own origin: the web server (or the edge) forwards it to the gateway, and the page's content security policy allows nothing else. Set it only to point the app somewhere else, and then the policy must allow that origin. For `npm run dev -w web` the dev server proxies `/graphql` to `DEV_GATEWAY` (default `http://localhost:4000`, where `compose.aura.yaml` publishes the gateway).
 
-## Use the fake Aura or a real one
+## The real Aura, and the fake for testing
 
-The setup uses mock-aura unless `AURA_BASE_URL` is set. Credentials for the fake are `mock-client` and `mock-secret`. For a real account set `AURA_BASE_URL=https://api.neo4j.io` and read [real-account-checklist.md](real-account-checklist.md) first: creates and deletes cost money and cannot be undone, and the browser test must never be pointed at a real account.
+The setup talks to the real Aura API (`https://api.neo4j.io`) by default: read [real-account-checklist.md](real-account-checklist.md) first, because creates and deletes cost money and cannot be undone. For development and tests add `compose.aura-mock.yaml` (in the `grandstack` repository), which starts mock-aura and fixes the Aura address to it, whatever `.env` says. Connect to the fake with `mock-client` and `mock-secret`. The browser test must never be pointed at a real account.
 
 ## Serve it to a phone or another machine
 

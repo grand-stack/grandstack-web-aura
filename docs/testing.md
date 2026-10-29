@@ -63,15 +63,15 @@ It checks that every path asks for a sign-in, that a wrong user, wrong password,
 `npm run e2e -w web` drives a real Chrome through the whole flow and checks 217 behaviours: connect (first with a wrong secret), the gallery, filters, search, sync after something changed in Aura, edit, review, confirm and follow progress, pause and resume, a change Aura refuses, a stale plan, create with the stepper, the password behind the eye, check with Aura, delete with the name typed, the account page, disconnect and reconnect, reset the stored copy (cancel, then reset, and the history, links and connection survive), and the theme. It runs on a phone-sized screen and a desktop-sized one and checks that nothing scrolls sideways, that every control has a name a screen reader can read, that each page has one heading, and that the browser logged no errors (under the strict content security policy, so a violation fails it).
 
 ```sh
-# from the grandstack folder, on a fresh stack (down -v first: it must have no account connected)
-docker compose -f compose.yaml -f compose.aura.yaml up -d --build
+# from the grandstack folder, on a fresh stack WITH THE FAKE AURA (down -v first: it must have no account connected)
+docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-mock.yaml up -d --build
 # then, from this repository
 BASE_URL=http://localhost:3000 npm run e2e -w web
 ```
 
-The run changes the fake Aura directly (port 4020), which the edge overlay closes, so it runs on the plain setup. The edge has its own checks (the section above), and the content security policy that the run enforces is the web server's, which the edge repeats.
+The run changes the fake Aura directly (port 4020), which the fake-Aura overlay publishes and the edge overlay does not, so it runs on the plain setup. It stops at once if the fake is not there, so it can never be run against a real account. The edge has its own checks (the section above), and the content security policy that the run enforces is the web server's, which the edge repeats.
 
-Setup, variables and caveats are in [web/e2e/README.md](../web/e2e/README.md). In short: it needs a **fresh** stack with the fake Aura (it stops at once if an account is already connected), and it changes things in the fake only: it creates and deletes instances there. `OUT=dir` writes about thirty screenshots. **Look at them.** The status chips stretched across every card and the phone top bar wrapping onto two lines both passed every check and showed up in screenshots.
+Setup, variables and caveats are in [web/e2e/README.md](../web/e2e/README.md). In short: it needs a **fresh** stack with the fake Aura (`compose.aura-mock.yaml`) (it stops at once if an account is already connected), and it changes things in the fake only: it creates and deletes instances there. `OUT=dir` writes about thirty screenshots. **Look at them.** The status chips stretched across every card and the phone top bar wrapping onto two lines both passed every check and showed up in screenshots.
 
 ## 8. Looking at what you changed
 
@@ -92,9 +92,9 @@ mock-aura follows the OpenAPI file, so it shares the file's mistakes. A read-onl
 `.github/workflows/ci.yml` has two jobs. Both check out the sibling repositories, because this repository runs on them: `grandstack-server` for the integration tests, and `grandstack`, `grandstack-server` and `grandstack-federation` for the stack.
 
 - **test**: install, typecheck, the docs check, `npm audit --omit=dev --audit-level=high` (what ships), build the sibling server, and `npm test` with a Neo4j service container, so the integration tests run.
-- **stack**: start the setup from `grandstack`'s `compose.aura.yaml`, check the committed supergraph is what the running subgraphs compose to, run the browser test, then switch to `compose.aura-edge.yaml` and run the edge checks (including the rate limit on a second, low-limit edge) with only the edge published.
+- **stack**: start the setup from `grandstack`'s `compose.aura.yaml` with the fake Aura (`compose.aura-mock.yaml`), check the committed supergraph is what the running subgraphs compose to, run the browser test, then switch to `compose.aura-edge.yaml` and run the edge checks (including the rate limit on a second, low-limit edge) with only the edge published.
 
-The sibling checkouts use the `aura-model` branch while `MODEL` and `READ_ONLY` are not yet merged (set in the workflow's `env`); change them to `main` afterwards. Actions are pinned by commit. The `grandstack` repository's nightly `integration` workflow also runs this setup (`scripts/integration.sh aura`). The workflow's YAML parses and its commands are the ones run locally, but it has not been run on GitHub.
+The sibling checkouts use the `aura-model` branch while `MODEL` and `READ_ONLY` are not yet merged (set in the workflow's `env`); change them to `main` afterwards. Releases use the same shared workflows as the other GRANDstack repositories: `release.yml` (a pushed `vMAJOR.MINOR.PATCH` tag on `main`, after a green `ci.yml` run), `release-cut.yml` (the release button, which sets the version in every `package.json`, tags and publishes), and `dependency-review.yml`; `dependabot.yml` proposes weekly updates. A release publishes four images (`grandstack-web-aura-subgraph`, `-mock`, `-web`, `-edge`) and tells the website and `grandstack` that it happened. Actions are pinned by commit. The `grandstack` repository's nightly `integration` workflow also runs this setup (`scripts/integration.sh aura`). The workflow's YAML parses and its commands are the ones run locally, but it has not been run on GitHub.
 
 ## When a check fails
 

@@ -10,10 +10,10 @@ Clone `grandstack`, `grandstack-server`, `grandstack-federation` and this reposi
 
 ```sh
 (cd ../grandstack-web-aura && scripts/init-env.sh)                      # once: SECRET_KEY into grandstack/.env
-docker compose -f compose.yaml -f compose.aura.yaml up --build
+docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-mock.yaml up --build     # the fake Aura, for development
 ```
 
-The app is at http://localhost:3000 (connect with `mock-client` and `mock-secret`). The same overlay publishes the gateway (4000), the read-only server (4001), the Aura subgraph (4010), mock-aura (4020) and Neo4j (7474, 7687), on this machine only. `down -v` deletes the Aura data and the sealed secrets; it does not touch the Movies setup's data.
+This talks to your **real** Aura account. For development and tests start the fake Aura instead, by adding `-f compose.aura-mock.yaml` (connect with `mock-client` and `mock-secret`; it publishes mock-aura on 4020). The app is at http://localhost:3000. The overlay publishes the gateway (4000), the read-only server (4001), the Aura subgraph (4010) and Neo4j (7474, 7687), on this machine only. `down -v` deletes the Aura data and the sealed secrets; it does not touch the Movies setup's data.
 
 ## Show a new field Aura returns
 
@@ -100,9 +100,9 @@ echo "EDGE_BIND=0.0.0.0" >> ../grandstack/.env
 
 Then open `https://192.168.0.5:8443` on the phone and accept the certificate warning. A password you choose is as strong as you make it: the edge only limits guessing to about 20 requests a second per address. Read [deploying.md](deploying.md) first.
 
-## Point it at a real Aura account
+## Use a real Aura account
 
-Read [real-account-checklist.md](real-account-checklist.md). Then set `AURA_BASE_URL=https://api.neo4j.io` in `.env` and start the stack. Connect with a client ID and secret from the Aura Console, read first, and create, change or delete only what you can afford to lose. Pass credentials in the browser form or the environment; never write them to a file or a commit. Tear the stack down with `down -v` afterwards so the sealed secret does not stay in a volume.
+This is the default. Read [real-account-checklist.md](real-account-checklist.md), then start the stack without the fake-Aura overlay (`compose.yaml` and `compose.aura.yaml`). Connect with a client ID and secret from the Aura Console, read first, and create, change or delete only what you can afford to lose. Pass credentials in the browser form or the environment; never write them to a file or a commit. Tear the stack down with `down -v` afterwards so the sealed secret does not stay in a volume.
 
 ## Before you commit
 

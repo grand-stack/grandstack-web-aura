@@ -9,7 +9,7 @@ It uses the other repositories for what they already do:
 | `grandstack-server` | The GraphQL API over Neo4j. Run with `MODEL=aura` it serves this repository's graph model, twice: read-only (`READ_ONLY=true`) and writable. There is no server code in this repository |
 | `grandstack-federation` | The gateway image. This repository mounts its own `supergraph.graphql` and `gateway.config.ts` into it, the way that repository's own setup does for Wikipedia |
 | `grandstack` | The compose files: `compose.aura.yaml` (and `compose.aura-edge.yaml`) run the whole setup beside the others |
-| `grandstack-web-aura` (this one) | The graph model, the Aura subgraph, mock-aura, the web app, the optional edge, and the gateway's config files |
+| `grandstack-web-aura` (this one) | The graph model, the Aura subgraph, the web app, the optional edge, the gateway's config files, and mock-aura (a fake Aura for tests) |
 
 Applies to grandstack-web-aura v0.0.1 with grandstack-server (the version that adds `MODEL` and `READ_ONLY`), React 19, Vite 8, urql 5, `@neo4j/graphql` 7 on Apollo Federation 2, Hive Gateway 2 and TypeScript. The design decisions and the build history are in [PLAN.md](../PLAN.md); this page describes what exists.
 
@@ -25,7 +25,7 @@ Applies to grandstack-web-aura v0.0.1 with grandstack-server (the version that a
 | Gateway | Hive Gateway (the `grandstack-federation` image), composed with `mesh-compose` | `gateway/supergraph.graphql` is generated and committed, and mounted into the image. |
 | Database | Neo4j 2026.10 (community) | The cache, plus history and sealed secrets. |
 | Edge (optional) | nginx | TLS, Basic sign-in, rate limits, security headers. |
-| Fake Aura | `mock-aura` | A fake of the Aura API, checked against Aura's own OpenAPI file. |
+| Fake Aura (testing only) | `mock-aura` | A fake of the Aura API, checked against Aura's own OpenAPI file. Not part of the default setup: `compose.aura-mock.yaml` adds it. |
 | Styling | Plain CSS with design tokens | `web/src/theme/tokens.css`, light, dark and follow-the-system. |
 | Images | None | Posters and initials are generated in the browser. |
 
@@ -36,7 +36,7 @@ Applies to grandstack-web-aura v0.0.1 with grandstack-server (the version that a
 | `server` | `grandstack-server`, `MODEL=aura`, `READ_ONLY=true`, a federation subgraph. The gateway and the web app read through it | 4001 (4000 inside) |
 | `store-writer` | The same image and model, writable. Only the Aura subgraph uses it | none |
 | `aura` | The Aura subgraph: REST client and token manager, sync, sealed secrets, operations | 4010 |
-| `mock-aura` | A fake Aura API for development and tests | 4020 |
+| `mock-aura` | A fake Aura API, **testing only** (`compose.aura-mock.yaml`); the default setup talks to the real Aura | 4020 |
 | `gateway` | Hive Gateway with this repository's supergraph and config | 4000 |
 | `web` | The React app, served by nginx, which also forwards `/graphql` | 3000 |
 | `edge` | Optional nginx in front of everything | 8443 |
@@ -92,7 +92,7 @@ docs/
 scripts/init-env.sh          writes SECRET_KEY into ../grandstack/.env, and with --edge the certificate and sign-in
 ```
 
-The compose files are **not here**. They are `compose.aura.yaml` and `compose.aura-edge.yaml` in the `grandstack` repository, which builds this repository's `aura/`, `mock-aura/`, `web/` and `edge/` from the sibling folder and mounts `models/` and `gateway/` into the server and gateway.
+The compose files are **not here**. They are `compose.aura.yaml` and `compose.aura-edge.yaml` in the `grandstack` repository, which builds this repository's `aura/`, `web/` and `edge/` (and `mock-aura/` for tests), `web/` and `edge/` from the sibling folder and mounts `models/` and `gateway/` into the server and gateway.
 
 ## The graph model
 
@@ -163,7 +163,7 @@ Every image is pinned to an exact version **and** a digest. The web image builds
 1. **The default publishes the web server and the gateway**, on `127.0.0.1` only (ports 3000 and 4000), over plain HTTP.
 2. **There is no sign-in and no TLS in that mode.** It is for one person on their own machine. `WEB_BIND=0.0.0.0` would open it to the network with nothing in the way.
 3. **The edge** (`compose.aura-edge.yaml`) adds TLS 1.2+, an HTTP Basic sign-in from a bcrypt list, 20 requests a second per address, and 60 POSTs a minute (the changes). It refuses to start without a certificate and a hashed sign-in list.
-4. **Behind the edge nothing else is published.** The overlay uses compose's `!reset` to remove the ports of the web server, gateway, subgraphs, mock-aura and Neo4j.
+4. **Behind the edge nothing else is published.** The overlay uses compose's `!reset` to remove the ports of the web server, gateway, subgraphs and Neo4j.
 5. **The edge adds** a strict content security policy, no framing, no sniffing, no referrer, `no-store` on GraphQL answers (one may hold a password), a 64 kB body limit on `/graphql`, and it never forwards the sign-in to the upstreams.
 
 How to set up each mode, serve a phone, and what the sign-in does and does not protect: [deploying.md](deploying.md).

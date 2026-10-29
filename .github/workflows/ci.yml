@@ -75,8 +75,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      # Run from the grandstack folder, where the compose files are
-      COMPOSE: docker compose -f compose.yaml -f compose.aura.yaml
+      # Run from the grandstack folder, where the compose files are. Tests use the fake Aura (compose.aura-mock.yaml), never the real one.
+      COMPOSE: docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-mock.yaml
       EDGE_COMPOSE: docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-edge.yaml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

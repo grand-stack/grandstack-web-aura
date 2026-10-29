@@ -87,6 +87,14 @@ const typeInto = async (selector, value) => {
   if (value) await page.type(selector, value);
 };
 
+// The run connects, creates and deletes. It must only ever do that to the fake Aura, never to a real account.
+// DELETE /__faults only exists in the fake (it clears its test faults), so a 200 means this is it
+const fake = await fetch(`${MOCK}/__faults`, { method: "DELETE" }).then((r) => r.ok).catch(() => false);
+if (!fake) {
+  console.error(`The fake Aura is not answering at ${MOCK}. This run changes things in Aura, so it only runs against the fake: start the stack with compose.aura-mock.yaml (see e2e/README.md).`);
+  process.exit(2);
+}
+
 async function gql(query, variables) {
   const res = await fetch(GATEWAY, { method: "POST", headers: { "Content-Type": "application/json", ...(AUTH ? { Authorization: AUTH } : {}) }, body: JSON.stringify({ query, variables }) });
   return (await res.json()).data;
