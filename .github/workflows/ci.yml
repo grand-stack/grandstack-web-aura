@@ -121,8 +121,10 @@ jobs:
       - name: The committed supergraph is what the running subgraphs compose to
         working-directory: work/grandstack-web-aura
         run: |
-          npm run compose:supergraph
-          git diff --exit-code gateway/supergraph.graphql
+          # Compose to a temporary file and compare. Composing over gateway/supergraph.graphql would rewrite the file the running gateway
+          # has mounted and is watching, and it stops if it reads the file half written.
+          (cd gateway && npx mesh-compose -c mesh.config.ts -o "$RUNNER_TEMP/supergraph.graphql")
+          diff -u gateway/supergraph.graphql "$RUNNER_TEMP/supergraph.graphql"
       - name: The app in a real browser
         working-directory: work/grandstack-web-aura
         run: |
