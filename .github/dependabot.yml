@@ -1,7 +1,7 @@
 # Copyright (c) "Neo4j"
 # Neo4j Sweden AB [http://neo4j.com]
 # The ignores are pins that must hold (see AGENTS.md): graphql stays 16.x; @apollo/subgraph stays 2.14.4 (2.15.1 breaks @neo4j/graphql 7.6.4);
-# the Node images stay on the current LTS line (24). Everything else arrives as a pull request that CI validates.
+# graphql-yoga stays on 5.x (yoga 6 needs @graphql-tools/utils 13, which the Hive gateway and mesh-compose cannot run on yet); the Node images stay on the current LTS line (24). Everything else arrives as a pull request that CI validates.
 version: 2
 updates:
   - package-ecosystem: npm
