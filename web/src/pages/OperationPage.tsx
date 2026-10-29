@@ -7,7 +7,7 @@ import { CancelMutation, ConfirmMutation, OperationQuery } from "../graphql/docu
 import { errorMessage, useApp, useNow, usePoll, useTitle } from "../hooks";
 import { elapsed, operationVerb, parsePlan, progressOf } from "../lib/changes";
 import { formatDate } from "../lib/format";
-import { operationView } from "../lib/operations";
+import { operationSubject, operationView } from "../lib/operations";
 import { Banner, Button, EmptyState, Skeleton, StatusChip } from "../ui";
 import { Icon } from "../ui/Icon";
 
@@ -26,7 +26,7 @@ export function OperationPage() {
   const target = op?.target[0];
   const verb = op ? operationVerb(op.kind, plan.items) : "";
   // A create has no instance until Aura has made one: until then it is known by the name that was asked for
-  const subject = target?.name ?? plan.items.find((i) => i.field === "name")?.after ?? "instance";
+  const subject = op ? operationSubject(op) : "instance";
   const [typed, setTyped] = useState("");
   useTitle(op ? `${verb} ${subject}` : "Change");
 
@@ -47,7 +47,7 @@ export function OperationPage() {
   const stale = !!error && /plan the change again/i.test(error);
   const isDelete = op.kind === "DELETE";
   // The server checks the name too. This only keeps the button off until it is typed.
-  const nameTyped = !isDelete || typed === target?.name;
+  const nameTyped = !isDelete || typed === (target?.name ?? subject);
   const finished = op.status === "SUCCEEDED" || op.status === "FAILED" || op.status === "CANCELLED";
 
   const onConfirm = async () => {
@@ -125,7 +125,7 @@ export function OperationPage() {
         <section className="panel formpanel" aria-labelledby="typed-title">
           <h2 id="typed-title">Type the name to delete</h2>
           <div className="field">
-            <label htmlFor="typed" className="note" style={{ padding: 0 }}>This cannot be undone. Type <strong>{target?.name}</strong> to confirm.</label>
+            <label htmlFor="typed" className="note" style={{ padding: 0 }}>This cannot be undone. Type <strong>{target?.name ?? subject}</strong> to confirm.</label>
             <input id="typed" className="input" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoCapitalize="off" spellCheck={false} aria-describedby="typed-hint" />
             <div id="typed-hint" className="counter">{typed === "" ? "Nothing typed yet" : nameTyped ? "The name matches" : "That is not the name"}</div>
           </div>

@@ -1,7 +1,8 @@
 # Copyright (c) "Neo4j"
 # Neo4j Sweden AB [http://neo4j.com]
-# Two jobs: the tests (unit, and integration against a real Neo4j), and the whole stack (the committed supergraph is current, the edge
-# keeps its promises, and a real Chrome drives the app through it). Actions are pinned by commit, images by digest.
+# Two jobs: the tests (unit, and integration against a real Neo4j and the real grandstack-server), and the whole setup as the grandstack
+# repository's compose files run it (the committed supergraph is current, a real Chrome drives the app, and the edge keeps its promises).
+# This repository runs on its siblings, so they are checked out beside it. Actions are pinned by commit, images by digest.
 name: ci
 
 on:
@@ -18,11 +19,13 @@ concurrency:
 
 env:
   NODE_VERSION: "24.22.1"
+  # The branch of grandstack, grandstack-server and grandstack-federation to test against (the Aura setup: MODEL and READ_ONLY in the server, compose.aura.yaml in grandstack).
+  SIBLING_REF: main
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     services:
       neo4j:
         image: neo4j:2026.10.0-community@sha256:388c0e5c6d4543e3d0e6cee3d1e751c05ad9314aa73342cc63cd0ea0946e38bb
@@ -36,73 +39,115 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          path: work/grandstack-web-aura
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/grandstack-server
+          ref: ${{ env.SIBLING_REF }}
+          path: work/grandstack-server
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+      - name: Build grandstack-server (the integration tests run it)
+        working-directory: work/grandstack-server
+        run: npm ci && npm run build
       - run: npm ci
+        working-directory: work/grandstack-web-aura
       - run: npm run typecheck
+        working-directory: work/grandstack-web-aura
       - name: Documentation links and diagrams
         run: npm run docs:check
+        working-directory: work/grandstack-web-aura
       - name: Known vulnerabilities in what ships
         run: npm audit --omit=dev --audit-level=high
-      - name: Tests, with the integration tests against Neo4j
+        working-directory: work/grandstack-web-aura
+      - name: Tests, with the integration tests against Neo4j and the real server
         run: npm test
+        working-directory: work/grandstack-web-aura
         env:
           NEO4J_TEST_URI: bolt://localhost:7687
           NEO4J_TEST_PASSWORD: ci-test-password
 
   stack:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
-      # The app on plain HTTP (the default), with the other services published on loopback for the checks below
-      COMPOSE: docker compose -p gwa -f compose.yaml -f compose.dev.yaml
-      EDGE_COMPOSE: docker compose -p gwa -f compose.yaml -f compose.edge.yaml
+      # Run from the grandstack folder, where the compose files are. Tests use the fake Aura (compose.aura-mock.yaml), never the real one.
+      COMPOSE: docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-mock.yaml
+      EDGE_COMPOSE: docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-edge.yaml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          path: work/grandstack-web-aura
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/grandstack
+          ref: ${{ env.SIBLING_REF }}
+          path: work/grandstack
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/grandstack-server
+          ref: ${{ env.SIBLING_REF }}
+          path: work/grandstack-server
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/grandstack-federation
+          ref: ${{ env.SIBLING_REF }}
+          path: work/grandstack-federation
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
       - run: npm ci
+        working-directory: work/grandstack-web-aura
       - name: Keys, and the edge's certificate and sign-in
+        working-directory: work/grandstack-web-aura
         run: |
           sudo apt-get install -y --no-install-recommends apache2-utils
           ./scripts/init-env.sh --edge | tee init.out
           # The password is shown once, here, to a throwaway runner. It is not a secret of anyone's.
           echo "EDGE_PASSWORD=$(awk '/^Password/ {print $NF}' init.out)" >> "$GITHUB_ENV"
-      - name: Start the stack (plain HTTP)
+      - name: Start the setup (plain HTTP)
+        working-directory: work/grandstack
         run: |
           $COMPOSE up -d --build
-          for i in $(seq 1 90); do curl -sf 'http://localhost:3100/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
+          for i in $(seq 1 90); do curl -sf 'http://localhost:3000/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
       - name: The committed supergraph is what the running subgraphs compose to
+        working-directory: work/grandstack-web-aura
         run: |
-          npm run compose:supergraph
-          git diff --exit-code gateway/supergraph.graphql
+          # Compose to a temporary file and compare. Composing over gateway/supergraph.graphql would rewrite the file the running gateway
+          # has mounted and is watching, and it stops if it reads the file half written.
+          (cd gateway && npx mesh-compose -c mesh.config.ts -o "$RUNNER_TEMP/supergraph.graphql")
+          diff -u gateway/supergraph.graphql "$RUNNER_TEMP/supergraph.graphql"
       - name: The app in a real browser
+        working-directory: work/grandstack-web-aura
         run: |
           # The browser run needs a stack with no account connected, which this is
-          CHROME_PATH=/usr/bin/google-chrome npm run e2e -w web
+          CHROME_PATH=/usr/bin/google-chrome BASE_URL=http://localhost:3000 npm run e2e -w web
       - name: Switch to the edge, with only the edge published
+        working-directory: work/grandstack
         run: |
           $COMPOSE down -v
           $EDGE_COMPOSE up -d --build
           for i in $(seq 1 60); do [ "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:8443/healthz)" = 200 ] && break; sleep 2; done
           for i in $(seq 1 60); do curl -sfk -u "admin:$EDGE_PASSWORD" 'https://localhost:8443/graphql?query=%7B__typename%7D' >/dev/null && break; sleep 2; done
       - name: The edge keeps its promises
+        working-directory: work/grandstack-web-aura
         run: |
           # A second edge with a low mutation rate, to see mutations refused once it is passed
-          docker run -d --name edge-limited --network gwa_default -p 127.0.0.1:8444:8443 -e EDGE_MUTATION_RATE=6r/m \
+          docker run -d --name edge-limited --network grandstack_default -p 127.0.0.1:8444:8443 -e EDGE_MUTATION_RATE=6r/m \
             -v "$PWD/edge/secrets/htpasswd:/etc/nginx/secrets/htpasswd:ro" -v "$PWD/edge/secrets/tls.crt:/etc/nginx/secrets/tls.crt:ro" \
-            -v "$PWD/edge/secrets/tls.key:/etc/nginx/secrets/tls.key:ro" gwa-edge:latest
+            -v "$PWD/edge/secrets/tls.key:/etc/nginx/secrets/tls.key:ro" grandstack-edge:latest
           sleep 5
           LIMITED_URL=https://localhost:8444 node edge/check.mjs
         env:
           EDGE_USER: admin
       - name: Logs, if anything failed
         if: failure()
-        run: docker compose -p gwa logs --no-color --tail 80
+        working-directory: work/grandstack
+        run: $EDGE_COMPOSE logs --no-color --tail 80

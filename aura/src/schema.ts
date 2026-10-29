@@ -141,6 +141,12 @@ export const typeDefs = /* GraphQL */ `
     """Read Aura again now. Does nothing new if a sync is already running."""
     syncNow: SyncStart!
     """
+    Remove what came from Aura (tenants, their instance options, every instance) from the store and read it in again. Kept: the Aura
+    credentials, past changes and their steps, stored instance passwords, and sync history. Nothing changes in Aura. Refused while a sync
+    or a change is under way.
+    """
+    resetStore: SyncStart!
+    """
     Delete the stored client secret and stop syncing. Instances, stored passwords and history are kept, and nothing changes in
     Aura. Connect again to resume.
     """
@@ -189,6 +195,10 @@ export function buildSchema(service: AuraService): GraphQLSchema {
         connectAura: (_: unknown, args: { clientId: string; clientSecret: string }) => service.connect(args.clientId, args.clientSecret),
         syncNow: async () => {
           const { started, runId } = await service.syncNow();
+          return { started, syncRunId: runId };
+        },
+        resetStore: async () => {
+          const { started, runId } = await service.resetStore();
           return { started, syncRunId: runId };
         },
         disconnectAura: async () => {

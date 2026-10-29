@@ -1,6 +1,6 @@
 # Before using a real Aura account
 
-Everything so far has run against `mock-aura`, a fake of the Aura API that is checked against Aura's own OpenAPI file. A fake can still be wrong about things the file does not say. This is what to do the first time the app talks to a real account, and what has **not** been checked yet.
+The app talks to the real Aura API by default. Its tests run against `mock-aura`, a fake that is checked against Aura's own OpenAPI file, and a fake can still be wrong about things the file does not say. This is what to do the first time the app talks to a real account, and what has **not** been checked yet.
 
 ## Checked against real Aura (28 Oct 2026, read-only, with a test account)
 
@@ -21,8 +21,8 @@ Everything so far has run against `mock-aura`, a fake of the Aura API that is ch
 ## A first run, safely
 
 1. Make a **separate test tenant** (Aura project) that holds nothing you need, and a client id and secret for it. The secret cannot be limited to one project, so use an account where deleting is survivable.
-2. Start the stack as usual, set `AURA_BASE_URL=https://api.neo4j.io` in `.env`, and restart `aura`. `ALLOW_INSECURE_AURA_URL` has no effect on https.
-3. Connect, and watch the first sync: `docker compose -p gwa logs aura`. It should end in SUCCEEDED or SLOWED. Check that the instances, sizes and regions match the Console.
+2. Start the stack as usual (`compose.yaml` and `compose.aura.yaml`, without the fake-Aura overlay). It uses the real API by default.
+3. Connect, and watch the first sync: `docker compose -f compose.yaml -f compose.aura.yaml logs aura` (in the `grandstack` folder). It should end in SUCCEEDED or SLOWED. Check that the instances, sizes and regions match the Console.
 4. Create the **smallest free or cheapest instance** from the app. Check the review says what you expect, that the password shows, and that the instance appears in the Console with the same name and size.
 5. Edit its name, pause it, resume it, and delete it, each from the app. After each, compare the Console, and write down how long Aura took.
 6. Change something in the Console, then press "Check with Aura" on the instance. It should list the difference without changing anything.
@@ -30,4 +30,4 @@ Everything so far has run against `mock-aura`, a fake of the Aura API that is ch
 
 ## Never
 
-- Point `compose.dev.yaml`'s unauthenticated ports at a real account, or run the browser test (`npm run e2e -w web`) against one. It connects, creates and deletes.
+- Run the browser test (`npm run e2e -w web`) against a real account. It connects, creates and deletes. And do not open the plain (no sign-in) setup to a network while it holds a real account: use `compose.aura-edge.yaml`.

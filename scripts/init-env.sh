@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Copyright (c) "Neo4j"
 # Neo4j Sweden AB [http://neo4j.com]
-# Makes everything the stack needs before its first start, and nothing it already has:
-#   .env             the key that seals secrets, the database password and the token between the two subgraphs
+# Makes everything the Aura setup needs before its first start, and nothing it already has:
+#   .env             in the grandstack repository (beside this one), where compose reads it: the key that seals secrets (SECRET_KEY)
+#                    (the database password is left at the grandstack default). Set ENV_FILE to write somewhere else.
 # With --edge (needed for compose.edge.yaml, which puts TLS and a sign-in in front of the app):
 #   edge/secrets/    who may sign in (htpasswd, one user, bcrypt hash) and a self-signed certificate for localhost, to be replaced by
 #                    a real one anywhere else. The directory is private to you; the files are readable so the container's user can read
@@ -30,20 +31,28 @@ user="${EDGE_USER:-admin}"
 
 random() { openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-"$1"; }
 
-touch .env
-chmod 600 .env
+# compose reads .env from the grandstack repository, which sits beside this one
+if [ -z "${ENV_FILE:-}" ]; then
+  if [ -d ../grandstack ]; then ENV_FILE=../grandstack/.env; else ENV_FILE=.env; fi
+fi
+touch "$ENV_FILE"
+chmod 600 "$ENV_FILE"
+# A line that exists but has no value (as in .env.example) counts as missing
 ensure() { # name, value-generator
-  if ! grep -q "^$1=" .env; then
-    printf '%s=%s\n' "$1" "$($2)" >> .env
-    echo "wrote $1 to .env"
+  if ! grep -qE "^$1=.+" "$ENV_FILE"; then
+    grep -vE "^$1=" "$ENV_FILE" > "$ENV_FILE.tmp" || true
+    mv "$ENV_FILE.tmp" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    printf '%s=%s\n' "$1" "$($2)" >> "$ENV_FILE"
+    echo "wrote $1 to $ENV_FILE"
   fi
 }
 ensure SECRET_KEY "openssl rand -base64 32"
-ensure NEO4J_PASSWORD "random 32"
-ensure INTERNAL_TOKEN "random 40"
+# The database password is left alone: the grandstack compose file's Neo4j health check only knows the default (grandstack-dev), so a
+# different NEO4J_PASSWORD would make Neo4j look unhealthy. Set one yourself only if you also change that health check.
 
 if [ "$edge" = false ]; then
-  echo "ready: .env. Start with: docker compose -p gwa up -d --build   (add --edge here first to put TLS and a sign-in in front)"
+  echo "ready: $ENV_FILE. Start with, in the grandstack folder: docker compose -f compose.yaml -f compose.aura.yaml up --build   (run this again with --edge first to put TLS and a sign-in in front)"
   exit 0
 fi
 mkdir -p edge/secrets

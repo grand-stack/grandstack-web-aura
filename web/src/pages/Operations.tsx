@@ -6,7 +6,7 @@ import { useQuery } from "urql";
 import { OperationsQuery } from "../graphql/documents";
 import { useApp, useRefreshOnSync, useTitle } from "../hooks";
 import { formatDate, relativeTime } from "../lib/format";
-import { duration, kindLabel, matchesOperationFilter, operationView, type OperationFilter } from "../lib/operations";
+import { duration, kindLabel, matchesOperationFilter, operationSubject, operationView, type OperationFilter } from "../lib/operations";
 import { Banner, EmptyState, Skeleton, StatusChip, TagButton } from "../ui";
 
 const FILTERS: { key: OperationFilter; label: string }[] = [
@@ -59,7 +59,7 @@ export function Operations() {
                 <div className="listrow" key={op.id}>
                   <div className="main">
                     <div className="title">
-                      <Link to={`/operations/${encodeURIComponent(op.id)}`}>{kindLabel(op.kind)} {target ? target.name : "a new instance"}</Link>
+                      <Link to={`/operations/${encodeURIComponent(op.id)}`}>{kindLabel(op.kind)} {operationSubject(op)}</Link>
                     </div>
                     <div className="sub" title={formatDate(op.createdAt)}>
                       {relativeTime(op.createdAt)}{took ? ` · took ${took}` : ""}{op.requestedBy ? ` · ${op.requestedBy}` : ""}{op.error ? ` · ${op.error}` : ""}

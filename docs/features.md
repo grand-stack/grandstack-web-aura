@@ -16,7 +16,7 @@ Code: `web/src/pages/Setup.tsx`, `aura/src/service.ts` (`connect`), `aura/src/cl
 
 Code: `aura/src/sync.ts`, `aura/src/service.ts`.
 
-- A sync reads the tenants, each tenant's instance options, the instance list and then each instance's details, and writes the store through its internal endpoint. It runs at start-up when an account is connected, every 15 minutes (`SYNC_INTERVAL_MS`), and on **Sync now**. Only one runs at a time.
+- A sync reads the tenants, each tenant's instance options, the instance list and then each instance's details, and writes the store through the writable server. It runs at start-up when an account is connected, every 15 minutes (`SYNC_INTERVAL_MS`), and on **Sync now**. Only one runs at a time.
 - Each run is recorded as a `SyncRun`: SUCCEEDED, SLOWED when Aura asked it to wait, or FAILED with a plain-words reason. A failed run keeps what the store already had.
 - It is idempotent. An instance Aura no longer lists is marked `deletedInAuraAt` once and kept.
 - **Non-obvious (list is a summary):** `GET /instances` returns only id, name, tenant, cloud and created time. Status, size and the rest need one `GET /instances/{id}` each, so a sync costs one request per instance plus a few. A real account with three tenants and one instance syncs in about 13 seconds and 7 requests.
@@ -93,7 +93,7 @@ Code: `web/src/pages/Detail.tsx`, `aura/src/operations/run.ts`.
 
 Code: `web/src/pages/Create.tsx`, `web/src/lib/create.ts`, `aura/src/operations/plan.ts` (`normaliseCreate`).
 
-- Five steps, one decision each: tenant, cloud, region and tier, size, name and options. With one tenant the first step is skipped.
+- Five steps, one decision each: tenant, cloud, region and tier, size, name and options. With one tenant the first step is skipped. Tenant and cloud are lists of buttons; **region, tier and size are drop-downs**, because a real tenant offers a dozen regions and many sizes. Each drop-down starts with an entry that says what to do ("Choose a region"), the tier waits for a region ("Choose a region first"), and Continue stays off until a choice is made.
 - **Every list comes from the chosen tenant's stored options**, and choosing something earlier clears what depended on it (`choose` in `lib/create.ts`), so the form cannot hold a combination Aura would refuse. The server checks the combination again at plan time and again at confirm, because a sync may have changed what is offered.
 - **Only the chosen tenant's options are read,** once it is chosen. A real tenant offers about 3,000 combinations; reading every tenant's in one query was 1.5 MB.
 - The plan fills in the storage, version and region name from the offered option. The review shows only new values (there is no "before"), warns that creating can change what you are billed (this app does not know your plan), and says the password is stored.
@@ -145,6 +145,11 @@ Code: `web/src/pages/Account.tsx`.
 
 - The connection (the client ID with its middle hidden, never the secret), counts of what is stored, the options per tenant, recent syncs with their outcome, Sync now, **Replace credentials** (checked with Aura first; a wrong replacement leaves the connection as it was) and **Disconnect**.
 - **Disconnect deletes the stored client secret and stops syncing, and keeps instances, stored passwords and history.** Nothing changes in Aura. Connecting again resumes, and duplicates nothing.
+- **Reset the stored copy** (in the stored-copy panel) removes what came from Aura and reads it in again, after a confirmation that says what goes and what stays. Use it when the stored copy looks wrong, or after the model changed. It asks Aura for nothing but the usual sync, and changes nothing in Aura.
+  - **Removed:** everything the stored copy got from Aura: the tenants, their instance options, and every instance, including ones Aura no longer lists (so leftovers from a different Aura, such as the fake one, go too).
+  - **Kept:** the Aura credentials (so no new sign-in is needed), every past operation and its steps, the passwords stored for instances made here (Aura shows them once, so they cannot be read again), the cloud and tier tags, and the sync history.
+  - **How the links survive:** before deleting, each operation notes which instance it pointed at; after every sync the links are put back (`relinkAfterReset`) for instances the sync makes again, and stored passwords are re-attached to their instances by id. An operation on an instance Aura no longer has points at nothing, and is named from the operation itself (`operationSubject` reads the instance as it was when planned). A reset that was cut short is repaired by the next sync.
+  - **While it runs** the account's last-sync time is cleared, so the app shows the first-read screen until the new read finishes. It is refused while a sync or a change is under way, and when no account is connected.
 
 ## Status model
 

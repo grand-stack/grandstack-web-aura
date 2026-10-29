@@ -118,4 +118,35 @@ export class SecretStore {
   async deleteInstanceCredential(auraId: string): Promise<void> {
     await this.run((s) => s.run(`MATCH (c:InstanceCredential {instanceAuraId: $auraId}) DETACH DELETE c`, { auraId }));
   }
+
+  /**
+   * Empties the stored copy of what came from Aura, so a sync can read it again: the tenants, their instance options, and every
+   * instance, including those Aura no longer lists. Kept: the account and its sealed client secret, every operation and its steps,
+   * stored instance passwords (Aura shows them once, so they cannot be read again), the cloud and tier tags, and sync history.
+   *
+   * Before deleting, it notes on each operation which instance it pointed at, so `relinkAfterReset` can put the link back for an
+   * instance the sync makes again. An operation on an instance Aura no longer has stays without a link; the interface names it from the
+   * operation itself. Clearing the account's last sync time makes the app show the first-sync screen until the new read finishes.
+   */
+  async clearAuraCopy(accountId: string): Promise<{ tenants: number; options: number; instances: number }> {
+    const count = async (statement: string): Promise<number> => {
+      const result = await this.run((s) => s.run(statement));
+      return Number(result.records[0]!.get("n"));
+    };
+    await this.run((s) => s.run(`MATCH (o:Operation)-[:TARGETS]->(i:Instance) SET o.targetAuraId = i.auraId`));
+    const instances = await count(`MATCH (i:Instance) WITH collect(i) AS xs FOREACH (x IN xs | DETACH DELETE x) RETURN size(xs) AS n`);
+    const options = await count(`MATCH (c:InstanceConfiguration) WITH collect(c) AS xs FOREACH (x IN xs | DETACH DELETE x) RETURN size(xs) AS n`);
+    const tenants = await count(`MATCH (t:Tenant) WITH collect(t) AS xs FOREACH (x IN xs | DETACH DELETE x) RETURN size(xs) AS n`);
+    await this.run((s) => s.run(`MATCH (a:AuraAccount {id: $accountId}) SET a.lastSyncAt = null`, { accountId }));
+    return { tenants, options, instances };
+  }
+
+  /**
+   * Puts back the links `clearAuraCopy` took away, for whatever now exists: operations to their instances, and stored passwords to
+   * theirs. Idempotent and cheap, so it runs after every sync, which also repairs a reset that was interrupted.
+   */
+  async relinkAfterReset(): Promise<void> {
+    await this.run((s) => s.run(`MATCH (o:Operation) WHERE o.targetAuraId IS NOT NULL AND NOT (o)-[:TARGETS]->(:Instance) MATCH (i:Instance {auraId: o.targetAuraId}) MERGE (o)-[:TARGETS]->(i)`));
+    await this.run((s) => s.run(`MATCH (c:InstanceCredential) MATCH (i:Instance {auraId: c.instanceAuraId}) WHERE NOT (i)-[:HAS_CREDENTIAL]->(c) MERGE (i)-[:HAS_CREDENTIAL]->(c)`));
+  }
 }

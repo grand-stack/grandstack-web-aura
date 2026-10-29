@@ -4,8 +4,8 @@ This tool can delete databases from a phone. Read this before it is reachable by
 
 ## Two ways to run it
 
-- **Plain (the default)**: `compose.yaml` publishes the web server on `127.0.0.1:3100`, over HTTP, with no sign-in. Only for your own machine. `WEB_BIND=0.0.0.0` would open it to the network with nothing in the way, so do not.
-- **With the edge**: add `compose.edge.yaml`. The web server stops being published and the edge becomes the only way in, over TLS with a sign-in. Everything below is about this mode, and it is the one to use for a phone or another machine. Make its secrets with `scripts/init-env.sh --edge`.
+- **Plain (the default)**: `compose.aura.yaml` (in the `grandstack` repository) publishes the web server and gateway on `127.0.0.1`, over HTTP, with no sign-in. Only for your own machine. Binding them to `0.0.0.0` would open the app to the network with nothing in the way, so do not.
+- **With the edge**: add `compose.aura-edge.yaml`. The web server stops being published and the edge becomes the only way in, over TLS with a sign-in. Everything below is about this mode, and it is the one to use for a phone or another machine. Make its secrets with `scripts/init-env.sh --edge` (in this repository).
 
 ## What the sign-in is, and is not
 
@@ -22,7 +22,7 @@ The edge (`edge/`) asks for a username and password with HTTP Basic, over TLS, b
 1. Get a certificate for the name (Let's Encrypt, or your own CA). Put the certificate chain in `edge/secrets/tls.crt` and the key in `edge/secrets/tls.key`, then restart the edge. Renewal is yours to arrange: the edge reads the files at start.
 2. Set in `.env`: `PUBLIC_ORIGIN=https://your.host`, `EDGE_BIND=0.0.0.0` (or an address), `EDGE_PORT=443` if you want it. Binding below 1024 may need the container runtime to allow it, or put a port forward in front.
 3. Set `EDGE_HSTS=max-age=31536000` once the certificate is real. It tells browsers to use only HTTPS for the whole host, whatever the port, so do not set it for `localhost`.
-4. Open only that one port in the firewall. Nothing else is published unless you add `compose.dev.yaml`, which you must not.
+4. Open only that one port in the firewall. Nothing else is published behind the edge: `compose.aura-edge.yaml` closes the ports `compose.aura.yaml` opens on loopback.
 5. To reach it from a phone on the same network by a self-signed certificate, reissue it for the laptop's address: `EDGE_SAN="IP:192.168.0.5,DNS:mylaptop.local" scripts/init-env.sh --new-cert`, then recreate the edge. If the address changes (a new wifi lease), reissue it.
 
 ## Secrets and backups

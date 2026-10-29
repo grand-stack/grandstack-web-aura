@@ -19,6 +19,19 @@ function Option({ name, value, checked, onChange, title, sub }: { name: string; 
   );
 }
 
+/** A labelled drop-down with a first entry that says what to do, shown as the value until something is chosen. */
+function Choose({ id, label, value, onChange, placeholder, options, disabled }: { id: string; label: string; value: string; onChange: (value: string) => void; placeholder: string; options: { value: string; label: string }[]; disabled?: boolean }) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} className="input" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+        <option value="">{placeholder}</option>
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+}
+
 /**
  * Create an instance, one decision per screen. Every list is read from what the chosen tenant is offered, so a combination Aura would
  * refuse cannot be picked. Nothing is sent to Aura from here: the last step asks for a plan, which is reviewed and confirmed next.
@@ -113,28 +126,41 @@ export function Create() {
       )}
 
       {step === "where" && (
-        <>
-          <fieldset className="panel formpanel">
-            <legend>Region</legend>
-            {regionsOf(offers, choice.cloud).map((r) => <Option key={r.region} name="region" value={r.region} checked={choice.region === r.region} onChange={() => set({ region: r.region })} title={r.regionName} />)}
-          </fieldset>
-          {choice.region && (
-            <fieldset className="panel formpanel">
-              <legend>Tier</legend>
-              {tiersOf(offers, choice.cloud, choice.region).map((t) => <Option key={t} name="tier" value={t} checked={choice.type === t} onChange={() => set({ type: t })} title={tierName(t)} />)}
-            </fieldset>
-          )}
-        </>
+        <section className="panel formpanel" aria-labelledby="where-title">
+          <h2 id="where-title">Region and tier</h2>
+          <Choose
+            id="region"
+            label="Region"
+            value={choice.region}
+            onChange={(region) => set({ region })}
+            placeholder="Choose a region"
+            options={regionsOf(offers, choice.cloud).map((r) => ({ value: r.region, label: r.regionName }))}
+          />
+          <Choose
+            id="tier"
+            label="Tier"
+            value={choice.type}
+            onChange={(type) => set({ type })}
+            placeholder={choice.region ? "Choose a tier" : "Choose a region first"}
+            disabled={!choice.region}
+            options={tiersOf(offers, choice.cloud, choice.region).map((t) => ({ value: t, label: tierName(t) }))}
+          />
+        </section>
       )}
 
       {step === "size" && (
-        <fieldset className="panel formpanel">
-          <legend>Memory and storage</legend>
+        <section className="panel formpanel" aria-labelledby="size-title">
+          <h2 id="size-title">Memory and storage</h2>
           <p className="note">Aura sets these together. These are the sizes this tenant can create here.</p>
-          {sizesOf(offers, choice.cloud, choice.region, choice.type).map((s) => (
-            <Option key={sizeKey(s)} name="size" value={sizeKey(s)} checked={choice.size === sizeKey(s)} onChange={() => set({ size: sizeKey(s) })} title={`${size(s.memory)} memory`} sub={`${size(s.storage)} storage`} />
-          ))}
-        </fieldset>
+          <Choose
+            id="size"
+            label="Size"
+            value={choice.size}
+            onChange={(sz) => set({ size: sz })}
+            placeholder="Choose a size"
+            options={sizesOf(offers, choice.cloud, choice.region, choice.type).map((sz) => ({ value: sizeKey(sz), label: `${size(sz.memory)} memory, ${size(sz.storage)} storage` }))}
+          />
+        </section>
       )}
 
       {step === "name" && (

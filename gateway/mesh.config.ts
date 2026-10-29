@@ -8,7 +8,7 @@ import { defineConfig, loadGraphQLHTTPSubgraph } from "@graphql-mesh/compose-cli
 
 export const composeConfig = defineConfig({
   subgraphs: [
-    { sourceHandler: loadGraphQLHTTPSubgraph("Store", { endpoint: process.env.STORE_URL ?? "http://localhost:4001/graphql" }) },
+    { sourceHandler: loadGraphQLHTTPSubgraph("Neo4j", { endpoint: process.env.NEO4J_URL ?? "http://localhost:4001/graphql" }) },
     { sourceHandler: loadGraphQLHTTPSubgraph("Aura", { endpoint: process.env.AURA_URL ?? "http://localhost:4010/graphql" }) },
   ],
 });

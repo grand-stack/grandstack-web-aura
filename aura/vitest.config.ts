@@ -13,5 +13,8 @@ export default defineConfig({
   test: {
     // The integration tests share one database and each wipes it first, so test files must not run at the same time
     fileParallelism: false,
+    // They start real servers and sync a real database: seconds on a laptop, longer on a shared CI runner
+    testTimeout: 30_000,
+    hookTimeout: 120_000,
   },
 });

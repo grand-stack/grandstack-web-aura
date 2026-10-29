@@ -24,6 +24,7 @@
     "neo4j-driver": "6.2.0"
   },
   "devDependencies": {
+    "@neo4j/graphql": "7.6.4",
     "openapi-typescript": "7.13.0"
   }
 }

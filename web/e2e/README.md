@@ -4,15 +4,15 @@
 
 ## Run it
 
-1. Start a **fresh** stack from the repository root with the dev file (the run changes the fake Aura directly): `podman compose -p gwa -f compose.yaml -f compose.dev.yaml down -v`, then `up -d --build` with the same files. Run `scripts/init-env.sh` first if you have not. To run through the edge instead, add `-f compose.edge.yaml`, run `scripts/init-env.sh --edge`, and keep the sign-in password it prints. The fake Aura must be the one the stack uses (the default).
+1. Start a **fresh** stack with the **fake Aura** from the `grandstack` folder: `docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-mock.yaml down -v`, then `up -d --build` with the same files (run `scripts/init-env.sh` here first if you have not). The run stops at once if the fake is not there (it never goes near a real account), and its port (4020) must be published, which the edge overlay prevents: the run changes the fake directly, so it runs on the plain setup.
 2. `npm ci` once.
-3. `npm run e2e -w web` (through the edge: `BASE_URL=https://localhost:8443 E2E_PASSWORD=<the sign-in password> npm run e2e -w web`)
+3. `npm run e2e -w web`
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `E2E_PASSWORD` | unset | The sign-in password `scripts/init-env.sh --edge` printed. Needed only through the edge |
 | `E2E_USER` | `admin` | The sign-in user |
-| `BASE_URL` | `http://localhost:3100` | The app. For the edge use `https://localhost:8443`; its certificate is made for localhost, so the run trusts it when the host is `localhost` |
+| `BASE_URL` | `http://localhost:3000` | The app. If you use the edge for a look, `https://localhost:8443` works too; its certificate is made for localhost, so the run trusts it when the host is `localhost` |
 | `GRAPHQL_URL` | `$BASE_URL/graphql` | The gateway through the app, used to read what the app stored |
 | `MOCK_AURA_URL` | `http://localhost:4020` | The fake Aura, which the run changes (it deletes an instance there) |
 | `CHROME_PATH` | macOS Google Chrome path | A Chrome or Chromium executable. Set it on Linux, for example `/usr/bin/chromium` |

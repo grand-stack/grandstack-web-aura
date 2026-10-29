@@ -10,7 +10,7 @@ Layers from fastest to most realistic. A change that can send something to Aura,
 
 ## 2. Codegen as a schema check
 
-`npm run codegen -w web` reads the live schema from the gateway (`GRAPHQL_URL`, default `http://localhost:4100/graphql`, which needs `compose.dev.yaml`) and validates every document against it. An unknown field, a wrong variable type or a duplicate operation name fails the run and writes nothing. Run it after any schema change and commit `web/src/graphql/generated/`.
+`npm run codegen -w web` reads the live schema from the gateway (`GRAPHQL_URL`, default `http://localhost:4000/graphql`, where `compose.aura.yaml` publishes it) and validates every document against it. An unknown field, a wrong variable type or a duplicate operation name fails the run and writes nothing. Run it after any schema change and commit `web/src/graphql/generated/`.
 
 ## 3. Unit tests
 
@@ -19,9 +19,8 @@ Layers from fastest to most realistic. A change that can send something to Aura,
 | Workspace | Covers |
 | --- | --- |
 | `web` (137) | Filters and sorting, status and size formatting, theme, operations, `changes.ts` (plans, the edit form, progress, elapsed time), `create.ts` (what each step offers, what a change of choice clears) |
-| `aura` (152) | The REST client (token, `Retry-After`, no retry of a change), sealing, config, status grouping, plan and diff (normalise, stale, create, delete), the aura subgraph's GraphQL with a stand-in service, the shapes real Aura sends |
+| `aura` (172 + 118) | The REST client (token, `Retry-After`, no retry of a change), sealing, config, status grouping, plan and diff (normalise, stale, create, delete), the aura subgraph's GraphQL with a stand-in service, the shapes real Aura sends, and the graph model itself (types described, no password, secret, cipher or nonce field, a constraint for every natural key). The second number is the integration tests |
 | `mock-aura` (50) | Its behaviour, its fault injection, and the contract test below |
-| `store` (16 + 12) | The two schemas (nothing writable in the public one; no password, secret, cipher or nonce field in either) |
 | `gateway` (10) | The committed supergraph: the exact mutation list, that only `Mutation` can return a password, that a plan returns only an id |
 
 ## 4. The contract test
@@ -32,7 +31,7 @@ Layers from fastest to most realistic. A change that can send something to Aura,
 
 ## 5. Integration tests
 
-These run the real store schemas, the real aura subgraph and mock-aura in one process against a **real Neo4j**. They are skipped unless `NEO4J_TEST_URI` is set, and they refuse to wipe a database that holds anything but this app's own labels.
+These run the real aura subgraph and mock-aura in one process, with **two real `grandstack-server` processes** (one `READ_ONLY=true`, one writable, both `MODEL=aura`) against a **real Neo4j**. `grandstack-server` is a sibling repository: clone it beside this one on a version that has `MODEL` and `READ_ONLY`, run `npm ci && npm run build` in it, or set `GRANDSTACK_SERVER_DIR`. The tests are skipped unless `NEO4J_TEST_URI` is set, and they refuse to wipe a database that holds anything but this app's own labels.
 
 ```sh
 podman run -d --rm --name gwa-neo4j-test -p 7688:7687 -e NEO4J_AUTH=neo4j/gwa-test-password neo4j:2026.10-community
@@ -43,6 +42,7 @@ They cover, among other things (`aura/test/integration/`):
 
 - **Plan, confirm, progress** (`operations.test.ts`): nothing reaches Aura before a confirm, a double confirm sends once, a stale plan is refused, a refusal from Aura fails the change with its reason, a lost answer is never sent again, a timeout, and restart recovery for each state a crash can leave.
 - **Create, delete, passwords** (`lifecycle.test.ts`): a create stores the sealed password and links it; a lost answer is not retried; a delete needs the typed name and finishes only on a 404; a reveal is counted and audited and cannot happen unrecorded; a value copied onto another instance will not open; drift is reported without changing the stored copy.
+- **Reset** (`reset.test.ts`): the tenants, options and instances come back as they were; the credentials, past operations (relinked to their instances), stored passwords (still showable) and sync history are kept, and an instance Aura no longer lists is removed too while its operations stay and still name it; Aura is not changed; refused without an account, during a sync and during a change; and a reset cut short is repaired by the next sync.
 - **Secrets** (`secrets.test.ts`, `service.test.ts`): the client secret and passwords appear nowhere in the database, a log or an error.
 - **Sync** (`sync.test.ts`): idempotent, tags move, a removed instance is marked once, a failed run keeps what was there.
 
@@ -60,18 +60,18 @@ It checks that every path asks for a sign-in, that a wrong user, wrong password,
 
 ## 7. Browser end-to-end checks
 
-`npm run e2e -w web` drives a real Chrome through the whole flow and checks 201 behaviours: connect (first with a wrong secret), the gallery, filters, search, sync after something changed in Aura, edit, review, confirm and follow progress, pause and resume, a change Aura refuses, a stale plan, create with the stepper, the password behind the eye, check with Aura, delete with the name typed, the account page, disconnect and reconnect, and the theme. It runs on a phone-sized screen and a desktop-sized one and checks that nothing scrolls sideways, that every control has a name a screen reader can read, that each page has one heading, and that the browser logged no errors (under the strict content security policy, so a violation fails it).
+`npm run e2e -w web` drives a real Chrome through the whole flow and checks 217 behaviours: connect (first with a wrong secret), the gallery, filters, search, sync after something changed in Aura, edit, review, confirm and follow progress, pause and resume, a change Aura refuses, a stale plan, create with the stepper, the password behind the eye, check with Aura, delete with the name typed, the account page, disconnect and reconnect, reset the stored copy (cancel, then reset, and the history, links and connection survive), and the theme. It runs on a phone-sized screen and a desktop-sized one and checks that nothing scrolls sideways, that every control has a name a screen reader can read, that each page has one heading, and that the browser logged no errors (under the strict content security policy, so a violation fails it).
 
 ```sh
-podman compose -p gwa -f compose.yaml -f compose.dev.yaml down -v
-podman compose -p gwa -f compose.yaml -f compose.dev.yaml up -d --build
-npm run e2e -w web                       # http://localhost:3100
-# through the edge instead:
-#   scripts/init-env.sh --edge, add -f compose.edge.yaml, then
-#   BASE_URL=https://localhost:8443 E2E_PASSWORD=<password> npm run e2e -w web
+# from the grandstack folder, on a fresh stack WITH THE FAKE AURA (down -v first: it must have no account connected)
+docker compose -f compose.yaml -f compose.aura.yaml -f compose.aura-mock.yaml up -d --build
+# then, from this repository
+BASE_URL=http://localhost:3000 npm run e2e -w web
 ```
 
-Setup, variables and caveats are in [web/e2e/README.md](../web/e2e/README.md). In short: it needs a **fresh** stack with the fake Aura (it stops at once if an account is already connected), and it changes things in the fake only: it creates and deletes instances there. `OUT=dir` writes about thirty screenshots. **Look at them.** The status chips stretched across every card and the phone top bar wrapping onto two lines both passed every check and showed up in screenshots.
+The run changes the fake Aura directly (port 4020), which the fake-Aura overlay publishes and the edge overlay does not, so it runs on the plain setup. It stops at once if the fake is not there, so it can never be run against a real account. The edge has its own checks (the section above), and the content security policy that the run enforces is the web server's, which the edge repeats.
+
+Setup, variables and caveats are in [web/e2e/README.md](../web/e2e/README.md). In short: it needs a **fresh** stack with the fake Aura (`compose.aura-mock.yaml`) (it stops at once if an account is already connected), and it changes things in the fake only: it creates and deletes instances there. `OUT=dir` writes about thirty screenshots. **Look at them.** The status chips stretched across every card and the phone top bar wrapping onto two lines both passed every check and showed up in screenshots.
 
 ## 8. Looking at what you changed
 
@@ -89,16 +89,16 @@ mock-aura follows the OpenAPI file, so it shares the file's mistakes. A read-onl
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` has two jobs.
+`.github/workflows/ci.yml` has two jobs. Both check out the sibling repositories, because this repository runs on them: `grandstack-server` for the integration tests, and `grandstack`, `grandstack-server` and `grandstack-federation` for the stack.
 
-- **test**: install, typecheck, `npm audit --omit=dev --audit-level=high` (what ships), and `npm test` with a Neo4j service container, so the integration tests run.
-- **stack**: start the stack on plain HTTP, check the committed supergraph is what the running subgraphs compose to, run the browser test, then switch to the edge and run the edge checks (including the rate limit on a second, low-limit edge) with only the edge published.
+- **test**: install, typecheck, the docs check, `npm audit --omit=dev --audit-level=high` (what ships), build the sibling server, and `npm test` with a Neo4j service container, so the integration tests run.
+- **stack**: start the setup from `grandstack`'s `compose.aura.yaml` with the fake Aura (`compose.aura-mock.yaml`), check the committed supergraph is what the running subgraphs compose to, run the browser test, then switch to `compose.aura-edge.yaml` and run the edge checks (including the rate limit on a second, low-limit edge) with only the edge published.
 
-Actions are pinned by commit. The workflow's YAML parses and its commands are the ones run locally, but it has not been run on GitHub.
+The sibling checkouts use the `aura-model` branch while `MODEL` and `READ_ONLY` are not yet merged (set in the workflow's `env`); change them to `main` afterwards. Releases use the same shared workflows as the other GRANDstack repositories: `release.yml` (a pushed `vMAJOR.MINOR.PATCH` tag on `main`, after a green `ci.yml` run), `release-cut.yml` (the release button, which sets the version in every `package.json`, tags and publishes), and `dependency-review.yml`; `dependabot.yml` proposes weekly updates. A release publishes four images (`grandstack-web-aura-subgraph`, `-mock`, `-web`, `-edge`) and tells the website and `grandstack` that it happened. Actions are pinned by commit. The `grandstack` repository's nightly `integration` workflow also runs this setup (`scripts/integration.sh aura`). The workflow's YAML parses and its commands are the ones run locally, but it has not been run on GitHub.
 
 ## When a check fails
 
-- **`codegen` says `Cannot query field "x" on type "Y"`:** the running subgraphs do not have the field. Start the stack with the dev file, recompose the supergraph (`npm run compose:supergraph`), rebuild the gateway, and run codegen again.
+- **`codegen` says `Cannot query field "x" on type "Y"`:** the running subgraphs do not have the field. Start the stack, recompose the supergraph (`npm run compose:supergraph`), recreate the gateway, and run codegen again.
 - **CI says the supergraph differs:** you changed a subgraph schema and did not recompose. Recompose and commit it.
 - **The first sync against a real account fails with "The store rejected a change":** the real API sent a shape the store did not expect. The store's message is not shown in the app on purpose; reproduce it with a real response.
 - **The browser run fails on counts:** the stack is not fresh. Run `down -v` and start again.

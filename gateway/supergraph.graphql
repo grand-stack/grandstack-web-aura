@@ -86,10 +86,10 @@ schema
   
 enum join__Graph {
   AURA @join__graph(name: "Aura", url: "http://localhost:4010/graphql") 
-  STORE @join__graph(name: "Store", url: "http://localhost:4001/graphql") 
+  NEO4J @join__graph(name: "Neo4j", url: "http://localhost:4001/graphql") 
 }
 
-scalar TransportOptions @join__type(graph: AURA)  @join__type(graph: STORE) 
+scalar TransportOptions @join__type(graph: AURA)  @join__type(graph: NEO4J) 
 
 """
 Where the connection to Aura stands. Safe to show: it holds no secret.
@@ -235,7 +235,7 @@ type InstanceCheck @join__type(graph: AURA)  {
   differences: [InstanceDifference!]!
 }
 
-type Query @join__type(graph: AURA)  @join__type(graph: STORE)  {
+type Query @join__type(graph: AURA)  @join__type(graph: NEO4J)  {
   """
   The state of the connection to Aura.
   """
@@ -244,54 +244,54 @@ type Query @join__type(graph: AURA)  @join__type(graph: STORE)  {
   Compare one instance with what Aura says now, without changing the stored copy.
   """
   checkInstance(instanceId: String!) : InstanceCheck! @join__field(graph: AURA) 
-  auraAccountsConnection(first: Int, after: String, where: AuraAccountWhere, sort: [AuraAccountSort!]) : AuraAccountsConnection! @join__field(graph: STORE) 
-  auraAccounts(where: AuraAccountWhere, limit: Int, offset: Int, sort: [AuraAccountSort!]) : [AuraAccount!]! @join__field(graph: STORE) 
-  tenantsConnection(first: Int, after: String, where: TenantWhere, sort: [TenantSort!]) : TenantsConnection! @join__field(graph: STORE) 
-  tenants(where: TenantWhere, limit: Int, offset: Int, sort: [TenantSort!]) : [Tenant!]! @join__field(graph: STORE) 
+  auraAccountsConnection(first: Int, after: String, where: AuraAccountWhere, sort: [AuraAccountSort!]) : AuraAccountsConnection! @join__field(graph: NEO4J) 
+  auraAccounts(where: AuraAccountWhere, limit: Int, offset: Int, sort: [AuraAccountSort!]) : [AuraAccount!]! @join__field(graph: NEO4J) 
+  tenantsConnection(first: Int, after: String, where: TenantWhere, sort: [TenantSort!]) : TenantsConnection! @join__field(graph: NEO4J) 
+  tenants(where: TenantWhere, limit: Int, offset: Int, sort: [TenantSort!]) : [Tenant!]! @join__field(graph: NEO4J) 
   instanceConfigurationsConnection(
     first: Int
     after: String
     where: InstanceConfigurationWhere
     sort: [InstanceConfigurationSort!]
-  ): InstanceConfigurationsConnection! @join__field(graph: STORE) 
+  ): InstanceConfigurationsConnection! @join__field(graph: NEO4J) 
   instanceConfigurations(
     where: InstanceConfigurationWhere
     limit: Int
     offset: Int
     sort: [InstanceConfigurationSort!]
-  ): [InstanceConfiguration!]! @join__field(graph: STORE) 
+  ): [InstanceConfiguration!]! @join__field(graph: NEO4J) 
   cloudProvidersConnection(
     first: Int
     after: String
     where: CloudProviderWhere
     sort: [CloudProviderSort!]
-  ): CloudProvidersConnection! @join__field(graph: STORE) 
+  ): CloudProvidersConnection! @join__field(graph: NEO4J) 
   cloudProviders(
     where: CloudProviderWhere
     limit: Int
     offset: Int
     sort: [CloudProviderSort!]
-  ): [CloudProvider!]! @join__field(graph: STORE) 
-  tiersConnection(first: Int, after: String, where: TierWhere, sort: [TierSort!]) : TiersConnection! @join__field(graph: STORE) 
-  tiers(where: TierWhere, limit: Int, offset: Int, sort: [TierSort!]) : [Tier!]! @join__field(graph: STORE) 
-  instancesConnection(first: Int, after: String, where: InstanceWhere, sort: [InstanceSort!]) : InstancesConnection! @join__field(graph: STORE) 
-  instances(where: InstanceWhere, limit: Int, offset: Int, sort: [InstanceSort!]) : [Instance!]! @join__field(graph: STORE) 
-  operationsConnection(first: Int, after: String, where: OperationWhere, sort: [OperationSort!]) : OperationsConnection! @join__field(graph: STORE) 
-  operations(where: OperationWhere, limit: Int, offset: Int, sort: [OperationSort!]) : [Operation!]! @join__field(graph: STORE) 
+  ): [CloudProvider!]! @join__field(graph: NEO4J) 
+  tiersConnection(first: Int, after: String, where: TierWhere, sort: [TierSort!]) : TiersConnection! @join__field(graph: NEO4J) 
+  tiers(where: TierWhere, limit: Int, offset: Int, sort: [TierSort!]) : [Tier!]! @join__field(graph: NEO4J) 
+  instancesConnection(first: Int, after: String, where: InstanceWhere, sort: [InstanceSort!]) : InstancesConnection! @join__field(graph: NEO4J) 
+  instances(where: InstanceWhere, limit: Int, offset: Int, sort: [InstanceSort!]) : [Instance!]! @join__field(graph: NEO4J) 
+  operationsConnection(first: Int, after: String, where: OperationWhere, sort: [OperationSort!]) : OperationsConnection! @join__field(graph: NEO4J) 
+  operations(where: OperationWhere, limit: Int, offset: Int, sort: [OperationSort!]) : [Operation!]! @join__field(graph: NEO4J) 
   operationStepsConnection(
     first: Int
     after: String
     where: OperationStepWhere
     sort: [OperationStepSort!]
-  ): OperationStepsConnection! @join__field(graph: STORE) 
+  ): OperationStepsConnection! @join__field(graph: NEO4J) 
   operationSteps(
     where: OperationStepWhere
     limit: Int
     offset: Int
     sort: [OperationStepSort!]
-  ): [OperationStep!]! @join__field(graph: STORE) 
-  syncRunsConnection(first: Int, after: String, where: SyncRunWhere, sort: [SyncRunSort!]) : SyncRunsConnection! @join__field(graph: STORE) 
-  syncRuns(where: SyncRunWhere, limit: Int, offset: Int, sort: [SyncRunSort!]) : [SyncRun!]! @join__field(graph: STORE) 
+  ): [OperationStep!]! @join__field(graph: NEO4J) 
+  syncRunsConnection(first: Int, after: String, where: SyncRunWhere, sort: [SyncRunSort!]) : SyncRunsConnection! @join__field(graph: NEO4J) 
+  syncRuns(where: SyncRunWhere, limit: Int, offset: Int, sort: [SyncRunSort!]) : [SyncRun!]! @join__field(graph: NEO4J) 
 }
 
 type Mutation @join__type(graph: AURA)  {
@@ -304,6 +304,12 @@ type Mutation @join__type(graph: AURA)  {
   Read Aura again now. Does nothing new if a sync is already running.
   """
   syncNow: SyncStart!
+  """
+  Remove what came from Aura (tenants, their instance options, every instance) from the store and read it in again. Kept: the Aura
+  credentials, past changes and their steps, stored instance passwords, and sync history. Nothing changes in Aura. Refused while a sync
+  or a change is under way.
+  """
+  resetStore: SyncStart!
   """
   Delete the stored client secret and stop syncing. Instances, stored passwords and history are kept, and nothing changes in
   Aura. Connect again to resume.
@@ -351,7 +357,7 @@ type Mutation @join__type(graph: AURA)  {
 """
 The Aura account this app is connected to. Version 1 has exactly one.
 """
-type AuraAccount @join__type(graph: STORE)  {
+type AuraAccount @join__type(graph: NEO4J)  {
   """
   Stable id. The single account uses "default".
   """
@@ -388,48 +394,48 @@ type AuraAccount @join__type(graph: STORE)  {
   ): AuraAccountTenantsConnection!
 }
 
-type AuraAccountAggregate @join__type(graph: STORE)  {
+type AuraAccountAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: AuraAccountAggregateNode!
 }
 
-type AuraAccountAggregateNode @join__type(graph: STORE)  {
+type AuraAccountAggregateNode @join__type(graph: NEO4J)  {
   label: StringAggregateSelection!
   clientIdHint: StringAggregateSelection!
   connectedAt: StringAggregateSelection!
   lastSyncAt: StringAggregateSelection!
 }
 
-type AuraAccountEdge @join__type(graph: STORE)  {
+type AuraAccountEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: AuraAccount!
 }
 
-type AuraAccountsConnection @join__type(graph: STORE)  {
+type AuraAccountsConnection @join__type(graph: NEO4J)  {
   edges: [AuraAccountEdge!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: AuraAccountAggregate!
 }
 
-type AuraAccountTenantsConnection @join__type(graph: STORE)  {
+type AuraAccountTenantsConnection @join__type(graph: NEO4J)  {
   edges: [AuraAccountTenantsRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: AuraAccountTenantTenantsAggregateSelection!
 }
 
-type AuraAccountTenantsRelationship @join__type(graph: STORE)  {
+type AuraAccountTenantsRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Tenant!
 }
 
-type AuraAccountTenantTenantsAggregateSelection @join__type(graph: STORE)  {
+type AuraAccountTenantTenantsAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: AuraAccountTenantTenantsNodeAggregateSelection
 }
 
-type AuraAccountTenantTenantsNodeAggregateSelection @join__type(graph: STORE)  {
+type AuraAccountTenantTenantsNodeAggregateSelection @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   configsSyncedAt: StringAggregateSelection!
@@ -439,7 +445,7 @@ type AuraAccountTenantTenantsNodeAggregateSelection @join__type(graph: STORE)  {
 """
 A cloud provider, used as a gallery tag.
 """
-type CloudProvider @join__type(graph: STORE)  {
+type CloudProvider @join__type(graph: NEO4J)  {
   """
   gcp, aws or azure.
   """
@@ -456,26 +462,26 @@ type CloudProvider @join__type(graph: STORE)  {
   ): CloudProviderInstancesConnection!
 }
 
-type CloudProviderAggregate @join__type(graph: STORE)  {
+type CloudProviderAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: CloudProviderAggregateNode!
 }
 
-type CloudProviderAggregateNode @join__type(graph: STORE)  {
+type CloudProviderAggregateNode @join__type(graph: NEO4J)  {
   name: StringAggregateSelection!
 }
 
-type CloudProviderEdge @join__type(graph: STORE)  {
+type CloudProviderEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: CloudProvider!
 }
 
-type CloudProviderInstanceInstancesAggregateSelection @join__type(graph: STORE)  {
+type CloudProviderInstanceInstancesAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: CloudProviderInstanceInstancesNodeAggregateSelection
 }
 
-type CloudProviderInstanceInstancesNodeAggregateSelection @join__type(graph: STORE)  {
+type CloudProviderInstanceInstancesNodeAggregateSelection @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   status: StringAggregateSelection!
@@ -495,30 +501,30 @@ type CloudProviderInstanceInstancesNodeAggregateSelection @join__type(graph: STO
   deletedInAuraAt: StringAggregateSelection!
 }
 
-type CloudProviderInstancesConnection @join__type(graph: STORE)  {
+type CloudProviderInstancesConnection @join__type(graph: NEO4J)  {
   edges: [CloudProviderInstancesRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: CloudProviderInstanceInstancesAggregateSelection!
 }
 
-type CloudProviderInstancesRelationship @join__type(graph: STORE)  {
+type CloudProviderInstancesRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Instance!
 }
 
-type CloudProvidersConnection @join__type(graph: STORE)  {
+type CloudProvidersConnection @join__type(graph: NEO4J)  {
   edges: [CloudProviderEdge!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: CloudProviderAggregate!
 }
 
-type Count @join__type(graph: STORE)  {
+type Count @join__type(graph: NEO4J)  {
   nodes: Int!
 }
 
-type CountConnection @join__type(graph: STORE)  {
+type CountConnection @join__type(graph: NEO4J)  {
   nodes: Int!
   edges: Int!
 }
@@ -527,7 +533,7 @@ type CountConnection @join__type(graph: STORE)  {
 A cached Aura instance. This is the stored copy. A federated entity, so the aura subgraph can add live data to it.
 The password is not a field here. See hasStoredPassword and the reveal action in the aura subgraph.
 """
-type Instance @join__type(graph: STORE, key: "auraId")  {
+type Instance @join__type(graph: NEO4J, key: "auraId")  {
   """
   The instance id Aura assigns, for example a1b2c3d4.
   """
@@ -667,12 +673,12 @@ type Instance @join__type(graph: STORE, key: "auraId")  {
   ): InstanceOperationsConnection!
 }
 
-type InstanceAggregate @join__type(graph: STORE)  {
+type InstanceAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: InstanceAggregateNode!
 }
 
-type InstanceAggregateNode @join__type(graph: STORE)  {
+type InstanceAggregateNode @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   status: StringAggregateSelection!
@@ -692,23 +698,23 @@ type InstanceAggregateNode @join__type(graph: STORE)  {
   deletedInAuraAt: StringAggregateSelection!
 }
 
-type InstanceCloudConnection @join__type(graph: STORE)  {
+type InstanceCloudConnection @join__type(graph: NEO4J)  {
   edges: [InstanceCloudRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: InstanceCloudProviderCloudAggregateSelection!
 }
 
-type InstanceCloudProviderCloudAggregateSelection @join__type(graph: STORE)  {
+type InstanceCloudProviderCloudAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: InstanceCloudProviderCloudNodeAggregateSelection
 }
 
-type InstanceCloudProviderCloudNodeAggregateSelection @join__type(graph: STORE)  {
+type InstanceCloudProviderCloudNodeAggregateSelection @join__type(graph: NEO4J)  {
   name: StringAggregateSelection!
 }
 
-type InstanceCloudRelationship @join__type(graph: STORE)  {
+type InstanceCloudRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: CloudProvider!
 }
@@ -716,7 +722,7 @@ type InstanceCloudRelationship @join__type(graph: STORE)  {
 """
 One combination a tenant can create, as Aura lists it. Memory and storage come as a pair.
 """
-type InstanceConfiguration @join__type(graph: STORE)  {
+type InstanceConfiguration @join__type(graph: NEO4J)  {
   """
   Stable hash of cloud provider, region, type, memory, storage and version, so a sync can upsert and remove stale options.
   """
@@ -765,12 +771,12 @@ type InstanceConfiguration @join__type(graph: STORE)  {
   ): InstanceConfigurationTenantConnection!
 }
 
-type InstanceConfigurationAggregate @join__type(graph: STORE)  {
+type InstanceConfigurationAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: InstanceConfigurationAggregateNode!
 }
 
-type InstanceConfigurationAggregateNode @join__type(graph: STORE)  {
+type InstanceConfigurationAggregateNode @join__type(graph: NEO4J)  {
   key: StringAggregateSelection!
   cloudProvider: StringAggregateSelection!
   region: StringAggregateSelection!
@@ -782,53 +788,53 @@ type InstanceConfigurationAggregateNode @join__type(graph: STORE)  {
   syncedAt: StringAggregateSelection!
 }
 
-type InstanceConfigurationEdge @join__type(graph: STORE)  {
+type InstanceConfigurationEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: InstanceConfiguration!
 }
 
-type InstanceConfigurationsConnection @join__type(graph: STORE)  {
+type InstanceConfigurationsConnection @join__type(graph: NEO4J)  {
   edges: [InstanceConfigurationEdge!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: InstanceConfigurationAggregate!
 }
 
-type InstanceConfigurationTenantConnection @join__type(graph: STORE)  {
+type InstanceConfigurationTenantConnection @join__type(graph: NEO4J)  {
   edges: [InstanceConfigurationTenantRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: InstanceConfigurationTenantTenantAggregateSelection!
 }
 
-type InstanceConfigurationTenantRelationship @join__type(graph: STORE)  {
+type InstanceConfigurationTenantRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Tenant!
 }
 
-type InstanceConfigurationTenantTenantAggregateSelection @join__type(graph: STORE)  {
+type InstanceConfigurationTenantTenantAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: InstanceConfigurationTenantTenantNodeAggregateSelection
 }
 
-type InstanceConfigurationTenantTenantNodeAggregateSelection @join__type(graph: STORE)  {
+type InstanceConfigurationTenantTenantNodeAggregateSelection @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   configsSyncedAt: StringAggregateSelection!
   syncedAt: StringAggregateSelection!
 }
 
-type InstanceEdge @join__type(graph: STORE)  {
+type InstanceEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: Instance!
 }
 
-type InstanceOperationOperationsAggregateSelection @join__type(graph: STORE)  {
+type InstanceOperationOperationsAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: InstanceOperationOperationsNodeAggregateSelection
 }
 
-type InstanceOperationOperationsNodeAggregateSelection @join__type(graph: STORE)  {
+type InstanceOperationOperationsNodeAggregateSelection @join__type(graph: NEO4J)  {
   desired: StringAggregateSelection!
   before: StringAggregateSelection!
   diff: StringAggregateSelection!
@@ -841,72 +847,72 @@ type InstanceOperationOperationsNodeAggregateSelection @join__type(graph: STORE)
   error: StringAggregateSelection!
 }
 
-type InstanceOperationsConnection @join__type(graph: STORE)  {
+type InstanceOperationsConnection @join__type(graph: NEO4J)  {
   edges: [InstanceOperationsRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: InstanceOperationOperationsAggregateSelection!
 }
 
-type InstanceOperationsRelationship @join__type(graph: STORE)  {
+type InstanceOperationsRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Operation!
 }
 
-type InstancesConnection @join__type(graph: STORE)  {
+type InstancesConnection @join__type(graph: NEO4J)  {
   edges: [InstanceEdge!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: InstanceAggregate!
 }
 
-type InstanceTenantConnection @join__type(graph: STORE)  {
+type InstanceTenantConnection @join__type(graph: NEO4J)  {
   edges: [InstanceTenantRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: InstanceTenantTenantAggregateSelection!
 }
 
-type InstanceTenantRelationship @join__type(graph: STORE)  {
+type InstanceTenantRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Tenant!
 }
 
-type InstanceTenantTenantAggregateSelection @join__type(graph: STORE)  {
+type InstanceTenantTenantAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: InstanceTenantTenantNodeAggregateSelection
 }
 
-type InstanceTenantTenantNodeAggregateSelection @join__type(graph: STORE)  {
+type InstanceTenantTenantNodeAggregateSelection @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   configsSyncedAt: StringAggregateSelection!
   syncedAt: StringAggregateSelection!
 }
 
-type InstanceTierConnection @join__type(graph: STORE)  {
+type InstanceTierConnection @join__type(graph: NEO4J)  {
   edges: [InstanceTierRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: InstanceTierTierAggregateSelection!
 }
 
-type InstanceTierRelationship @join__type(graph: STORE)  {
+type InstanceTierRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Tier!
 }
 
-type InstanceTierTierAggregateSelection @join__type(graph: STORE)  {
+type InstanceTierTierAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: InstanceTierTierNodeAggregateSelection
 }
 
-type InstanceTierTierNodeAggregateSelection @join__type(graph: STORE)  {
+type InstanceTierTierNodeAggregateSelection @join__type(graph: NEO4J)  {
   type: StringAggregateSelection!
   label: StringAggregateSelection!
 }
 
-type IntAggregateSelection @join__type(graph: STORE)  {
+type IntAggregateSelection @join__type(graph: NEO4J)  {
   max: Int
   min: Int
   average: Float
@@ -916,7 +922,7 @@ type IntAggregateSelection @join__type(graph: STORE)  {
 """
 A change made through this app: planned, reviewed, confirmed, then applied to Aura. Also the audit log.
 """
-type Operation @join__type(graph: STORE)  {
+type Operation @join__type(graph: NEO4J)  {
   """
   Unique id.
   """
@@ -996,12 +1002,12 @@ type Operation @join__type(graph: STORE)  {
   ): OperationStepsConnection!
 }
 
-type OperationAggregate @join__type(graph: STORE)  {
+type OperationAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: OperationAggregateNode!
 }
 
-type OperationAggregateNode @join__type(graph: STORE)  {
+type OperationAggregateNode @join__type(graph: NEO4J)  {
   desired: StringAggregateSelection!
   before: StringAggregateSelection!
   diff: StringAggregateSelection!
@@ -1014,17 +1020,17 @@ type OperationAggregateNode @join__type(graph: STORE)  {
   error: StringAggregateSelection!
 }
 
-type OperationEdge @join__type(graph: STORE)  {
+type OperationEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: Operation!
 }
 
-type OperationInstanceTargetAggregateSelection @join__type(graph: STORE)  {
+type OperationInstanceTargetAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: OperationInstanceTargetNodeAggregateSelection
 }
 
-type OperationInstanceTargetNodeAggregateSelection @join__type(graph: STORE)  {
+type OperationInstanceTargetNodeAggregateSelection @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   status: StringAggregateSelection!
@@ -1044,19 +1050,19 @@ type OperationInstanceTargetNodeAggregateSelection @join__type(graph: STORE)  {
   deletedInAuraAt: StringAggregateSelection!
 }
 
-type OperationOperationStepStepsAggregateSelection @join__type(graph: STORE)  {
+type OperationOperationStepStepsAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: OperationOperationStepStepsNodeAggregateSelection
 }
 
-type OperationOperationStepStepsNodeAggregateSelection @join__type(graph: STORE)  {
+type OperationOperationStepStepsNodeAggregateSelection @join__type(graph: NEO4J)  {
   seq: IntAggregateSelection!
   label: StringAggregateSelection!
   at: StringAggregateSelection!
   detail: StringAggregateSelection!
 }
 
-type OperationsConnection @join__type(graph: STORE)  {
+type OperationsConnection @join__type(graph: NEO4J)  {
   edges: [OperationEdge!]!
   totalCount: Int!
   pageInfo: PageInfo!
@@ -1066,7 +1072,7 @@ type OperationsConnection @join__type(graph: STORE)  {
 """
 One line in an operation's progress timeline.
 """
-type OperationStep @join__type(graph: STORE)  {
+type OperationStep @join__type(graph: NEO4J)  {
   """
   Order within the operation, starting at 1.
   """
@@ -1099,36 +1105,36 @@ type OperationStep @join__type(graph: STORE)  {
   ): OperationStepOperationConnection!
 }
 
-type OperationStepAggregate @join__type(graph: STORE)  {
+type OperationStepAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: OperationStepAggregateNode!
 }
 
-type OperationStepAggregateNode @join__type(graph: STORE)  {
+type OperationStepAggregateNode @join__type(graph: NEO4J)  {
   seq: IntAggregateSelection!
   label: StringAggregateSelection!
   at: StringAggregateSelection!
   detail: StringAggregateSelection!
 }
 
-type OperationStepEdge @join__type(graph: STORE)  {
+type OperationStepEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: OperationStep!
 }
 
-type OperationStepOperationConnection @join__type(graph: STORE)  {
+type OperationStepOperationConnection @join__type(graph: NEO4J)  {
   edges: [OperationStepOperationRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: OperationStepOperationOperationAggregateSelection!
 }
 
-type OperationStepOperationOperationAggregateSelection @join__type(graph: STORE)  {
+type OperationStepOperationOperationAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: OperationStepOperationOperationNodeAggregateSelection
 }
 
-type OperationStepOperationOperationNodeAggregateSelection @join__type(graph: STORE)  {
+type OperationStepOperationOperationNodeAggregateSelection @join__type(graph: NEO4J)  {
   desired: StringAggregateSelection!
   before: StringAggregateSelection!
   diff: StringAggregateSelection!
@@ -1141,31 +1147,31 @@ type OperationStepOperationOperationNodeAggregateSelection @join__type(graph: ST
   error: StringAggregateSelection!
 }
 
-type OperationStepOperationRelationship @join__type(graph: STORE)  {
+type OperationStepOperationRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Operation!
 }
 
-type OperationStepsConnection @join__type(graph: STORE)  {
+type OperationStepsConnection @join__type(graph: NEO4J)  {
   edges: [OperationStepsRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: OperationOperationStepStepsAggregateSelection!
 }
 
-type OperationStepsRelationship @join__type(graph: STORE)  {
+type OperationStepsRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: OperationStep!
 }
 
-type OperationTargetConnection @join__type(graph: STORE)  {
+type OperationTargetConnection @join__type(graph: NEO4J)  {
   edges: [OperationTargetRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: OperationInstanceTargetAggregateSelection!
 }
 
-type OperationTargetRelationship @join__type(graph: STORE)  {
+type OperationTargetRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Instance!
 }
@@ -1173,14 +1179,14 @@ type OperationTargetRelationship @join__type(graph: STORE)  {
 """
 Pagination information (Relay)
 """
-type PageInfo @join__type(graph: STORE)  {
+type PageInfo @join__type(graph: NEO4J)  {
   hasNextPage: Boolean!
   hasPreviousPage: Boolean!
   startCursor: String
   endCursor: String
 }
 
-type StringAggregateSelection @join__type(graph: STORE)  {
+type StringAggregateSelection @join__type(graph: NEO4J)  {
   shortest: String
   longest: String
 }
@@ -1188,7 +1194,7 @@ type StringAggregateSelection @join__type(graph: STORE)  {
 """
 One run of the sync from Aura into this store.
 """
-type SyncRun @join__type(graph: STORE)  {
+type SyncRun @join__type(graph: NEO4J)  {
   """
   Unique id.
   """
@@ -1231,12 +1237,12 @@ type SyncRun @join__type(graph: STORE)  {
   error: String
 }
 
-type SyncRunAggregate @join__type(graph: STORE)  {
+type SyncRunAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: SyncRunAggregateNode!
 }
 
-type SyncRunAggregateNode @join__type(graph: STORE)  {
+type SyncRunAggregateNode @join__type(graph: NEO4J)  {
   startedAt: StringAggregateSelection!
   finishedAt: StringAggregateSelection!
   tenants: IntAggregateSelection!
@@ -1247,12 +1253,12 @@ type SyncRunAggregateNode @join__type(graph: STORE)  {
   error: StringAggregateSelection!
 }
 
-type SyncRunEdge @join__type(graph: STORE)  {
+type SyncRunEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: SyncRun!
 }
 
-type SyncRunsConnection @join__type(graph: STORE)  {
+type SyncRunsConnection @join__type(graph: NEO4J)  {
   edges: [SyncRunEdge!]!
   totalCount: Int!
   pageInfo: PageInfo!
@@ -1262,7 +1268,7 @@ type SyncRunsConnection @join__type(graph: STORE)  {
 """
 An Aura project. The Aura API calls it a tenant in its paths.
 """
-type Tenant @join__type(graph: STORE)  {
+type Tenant @join__type(graph: NEO4J)  {
   """
   The tenant id Aura assigns.
   """
@@ -1316,65 +1322,65 @@ type Tenant @join__type(graph: STORE)  {
   ): TenantConfigurationsConnection!
 }
 
-type TenantAccountConnection @join__type(graph: STORE)  {
+type TenantAccountConnection @join__type(graph: NEO4J)  {
   edges: [TenantAccountRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: TenantAuraAccountAccountAggregateSelection!
 }
 
-type TenantAccountRelationship @join__type(graph: STORE)  {
+type TenantAccountRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: AuraAccount!
 }
 
-type TenantAggregate @join__type(graph: STORE)  {
+type TenantAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: TenantAggregateNode!
 }
 
-type TenantAggregateNode @join__type(graph: STORE)  {
+type TenantAggregateNode @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   configsSyncedAt: StringAggregateSelection!
   syncedAt: StringAggregateSelection!
 }
 
-type TenantAuraAccountAccountAggregateSelection @join__type(graph: STORE)  {
+type TenantAuraAccountAccountAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: TenantAuraAccountAccountNodeAggregateSelection
 }
 
-type TenantAuraAccountAccountNodeAggregateSelection @join__type(graph: STORE)  {
+type TenantAuraAccountAccountNodeAggregateSelection @join__type(graph: NEO4J)  {
   label: StringAggregateSelection!
   clientIdHint: StringAggregateSelection!
   connectedAt: StringAggregateSelection!
   lastSyncAt: StringAggregateSelection!
 }
 
-type TenantConfigurationsConnection @join__type(graph: STORE)  {
+type TenantConfigurationsConnection @join__type(graph: NEO4J)  {
   edges: [TenantConfigurationsRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: TenantInstanceConfigurationConfigurationsAggregateSelection!
 }
 
-type TenantConfigurationsRelationship @join__type(graph: STORE)  {
+type TenantConfigurationsRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: InstanceConfiguration!
 }
 
-type TenantEdge @join__type(graph: STORE)  {
+type TenantEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: Tenant!
 }
 
-type TenantInstanceConfigurationConfigurationsAggregateSelection @join__type(graph: STORE)  {
+type TenantInstanceConfigurationConfigurationsAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: TenantInstanceConfigurationConfigurationsNodeAggregateSelection
 }
 
-type TenantInstanceConfigurationConfigurationsNodeAggregateSelection @join__type(graph: STORE)  {
+type TenantInstanceConfigurationConfigurationsNodeAggregateSelection @join__type(graph: NEO4J)  {
   key: StringAggregateSelection!
   cloudProvider: StringAggregateSelection!
   region: StringAggregateSelection!
@@ -1386,12 +1392,12 @@ type TenantInstanceConfigurationConfigurationsNodeAggregateSelection @join__type
   syncedAt: StringAggregateSelection!
 }
 
-type TenantInstanceInstancesAggregateSelection @join__type(graph: STORE)  {
+type TenantInstanceInstancesAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: TenantInstanceInstancesNodeAggregateSelection
 }
 
-type TenantInstanceInstancesNodeAggregateSelection @join__type(graph: STORE)  {
+type TenantInstanceInstancesNodeAggregateSelection @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   status: StringAggregateSelection!
@@ -1411,19 +1417,19 @@ type TenantInstanceInstancesNodeAggregateSelection @join__type(graph: STORE)  {
   deletedInAuraAt: StringAggregateSelection!
 }
 
-type TenantInstancesConnection @join__type(graph: STORE)  {
+type TenantInstancesConnection @join__type(graph: NEO4J)  {
   edges: [TenantInstancesRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: TenantInstanceInstancesAggregateSelection!
 }
 
-type TenantInstancesRelationship @join__type(graph: STORE)  {
+type TenantInstancesRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Instance!
 }
 
-type TenantsConnection @join__type(graph: STORE)  {
+type TenantsConnection @join__type(graph: NEO4J)  {
   edges: [TenantEdge!]!
   totalCount: Int!
   pageInfo: PageInfo!
@@ -1433,7 +1439,7 @@ type TenantsConnection @join__type(graph: STORE)  {
 """
 An Aura tier (the API's instance type), used as a gallery tag.
 """
-type Tier @join__type(graph: STORE)  {
+type Tier @join__type(graph: NEO4J)  {
   """
   The API value, for example business-critical.
   """
@@ -1454,27 +1460,27 @@ type Tier @join__type(graph: STORE)  {
   ): TierInstancesConnection!
 }
 
-type TierAggregate @join__type(graph: STORE)  {
+type TierAggregate @join__type(graph: NEO4J)  {
   count: Count!
   node: TierAggregateNode!
 }
 
-type TierAggregateNode @join__type(graph: STORE)  {
+type TierAggregateNode @join__type(graph: NEO4J)  {
   type: StringAggregateSelection!
   label: StringAggregateSelection!
 }
 
-type TierEdge @join__type(graph: STORE)  {
+type TierEdge @join__type(graph: NEO4J)  {
   cursor: String!
   node: Tier!
 }
 
-type TierInstanceInstancesAggregateSelection @join__type(graph: STORE)  {
+type TierInstanceInstancesAggregateSelection @join__type(graph: NEO4J)  {
   count: CountConnection!
   node: TierInstanceInstancesNodeAggregateSelection
 }
 
-type TierInstanceInstancesNodeAggregateSelection @join__type(graph: STORE)  {
+type TierInstanceInstancesNodeAggregateSelection @join__type(graph: NEO4J)  {
   auraId: StringAggregateSelection!
   name: StringAggregateSelection!
   status: StringAggregateSelection!
@@ -1494,19 +1500,19 @@ type TierInstanceInstancesNodeAggregateSelection @join__type(graph: STORE)  {
   deletedInAuraAt: StringAggregateSelection!
 }
 
-type TierInstancesConnection @join__type(graph: STORE)  {
+type TierInstancesConnection @join__type(graph: NEO4J)  {
   edges: [TierInstancesRelationship!]!
   totalCount: Int!
   pageInfo: PageInfo!
   aggregate: TierInstanceInstancesAggregateSelection!
 }
 
-type TierInstancesRelationship @join__type(graph: STORE)  {
+type TierInstancesRelationship @join__type(graph: NEO4J)  {
   cursor: String!
   node: Instance!
 }
 
-type TiersConnection @join__type(graph: STORE)  {
+type TiersConnection @join__type(graph: NEO4J)  {
   edges: [TierEdge!]!
   totalCount: Int!
   pageInfo: PageInfo!
@@ -1516,151 +1522,151 @@ type TiersConnection @join__type(graph: STORE)  {
 """
 Whether the Aura account is currently connected.
 """
-enum ConnectionStatus @join__type(graph: STORE)  {
+enum ConnectionStatus @join__type(graph: NEO4J)  {
   """
   Credentials are stored and the account is being synced.
   """
-  CONNECTED @join__enumValue(graph: STORE) 
+  CONNECTED @join__enumValue(graph: NEO4J) 
   """
   The stored client secret has been deleted. Instances, passwords and history are kept.
   """
-  DISCONNECTED @join__enumValue(graph: STORE) 
+  DISCONNECTED @join__enumValue(graph: NEO4J) 
 }
 
 """
 The coarse state of an instance, derived from the 13 statuses the Aura API reports.
 """
-enum InstanceStatusGroup @join__type(graph: STORE)  {
+enum InstanceStatusGroup @join__type(graph: NEO4J)  {
   """
   running.
   """
-  READY @join__enumValue(graph: STORE) 
+  READY @join__enumValue(graph: NEO4J) 
   """
   paused or suspended.
   """
-  STOPPED @join__enumValue(graph: STORE) 
+  STOPPED @join__enumValue(graph: NEO4J) 
   """
   creating, updating, pausing, resuming, suspending, loading, restoring, overwriting or destroying. Edit, pause and delete are locked.
   """
-  IN_PROGRESS @join__enumValue(graph: STORE) 
+  IN_PROGRESS @join__enumValue(graph: NEO4J) 
   """
   loading failed.
   """
-  FAILED @join__enumValue(graph: STORE) 
+  FAILED @join__enumValue(graph: NEO4J) 
 }
 
 """
 What an operation does to an instance.
 """
-enum OperationKind @join__type(graph: STORE)  {
+enum OperationKind @join__type(graph: NEO4J)  {
   """
   Create a new instance.
   """
-  CREATE @join__enumValue(graph: STORE) 
+  CREATE @join__enumValue(graph: NEO4J) 
   """
   Rename, resize or change the vector and analytics settings.
   """
-  UPDATE @join__enumValue(graph: STORE) 
+  UPDATE @join__enumValue(graph: NEO4J) 
   """
   Delete an instance. Irreversible.
   """
-  DELETE @join__enumValue(graph: STORE) 
+  DELETE @join__enumValue(graph: NEO4J) 
   """
   Pause an instance.
   """
-  PAUSE @join__enumValue(graph: STORE) 
+  PAUSE @join__enumValue(graph: NEO4J) 
   """
   Resume a paused instance.
   """
-  RESUME @join__enumValue(graph: STORE) 
+  RESUME @join__enumValue(graph: NEO4J) 
 }
 
 """
 Where an operation is in plan, review, confirm, progress.
 """
-enum OperationStatus @join__type(graph: STORE)  {
+enum OperationStatus @join__type(graph: NEO4J)  {
   """
   Planned and shown for review. Nothing has been sent to Aura.
   """
-  PLANNED @join__enumValue(graph: STORE) 
+  PLANNED @join__enumValue(graph: NEO4J) 
   """
   Confirmed by a person. The reconciler may now call Aura.
   """
-  CONFIRMED @join__enumValue(graph: STORE) 
+  CONFIRMED @join__enumValue(graph: NEO4J) 
   """
   Sent to Aura and being followed until the instance settles.
   """
-  RUNNING @join__enumValue(graph: STORE) 
+  RUNNING @join__enumValue(graph: NEO4J) 
   """
   Finished as planned.
   """
-  SUCCEEDED @join__enumValue(graph: STORE) 
+  SUCCEEDED @join__enumValue(graph: NEO4J) 
   """
   Aura rejected it or the instance ended in a failed state.
   """
-  FAILED @join__enumValue(graph: STORE) 
+  FAILED @join__enumValue(graph: NEO4J) 
   """
   Withdrawn before it was sent.
   """
-  CANCELLED @join__enumValue(graph: STORE) 
+  CANCELLED @join__enumValue(graph: NEO4J) 
 }
 
 """
 An enum for sorting in either ascending or descending order.
 """
-enum SortDirection @join__type(graph: STORE)  {
+enum SortDirection @join__type(graph: NEO4J)  {
   """
   Sort by field values in ascending order.
   """
-  ASC @join__enumValue(graph: STORE) 
+  ASC @join__enumValue(graph: NEO4J) 
   """
   Sort by field values in descending order.
   """
-  DESC @join__enumValue(graph: STORE) 
+  DESC @join__enumValue(graph: NEO4J) 
 }
 
 """
 State of one step in an operation's timeline.
 """
-enum StepStatus @join__type(graph: STORE)  {
+enum StepStatus @join__type(graph: NEO4J)  {
   """
   Not started.
   """
-  PENDING @join__enumValue(graph: STORE) 
+  PENDING @join__enumValue(graph: NEO4J) 
   """
   In progress.
   """
-  ACTIVE @join__enumValue(graph: STORE) 
+  ACTIVE @join__enumValue(graph: NEO4J) 
   """
   Finished.
   """
-  DONE @join__enumValue(graph: STORE) 
+  DONE @join__enumValue(graph: NEO4J) 
   """
   Failed.
   """
-  FAILED @join__enumValue(graph: STORE) 
+  FAILED @join__enumValue(graph: NEO4J) 
 }
 
 """
 How a sync run ended.
 """
-enum SyncStatus @join__type(graph: STORE)  {
+enum SyncStatus @join__type(graph: NEO4J)  {
   """
   Still running.
   """
-  RUNNING @join__enumValue(graph: STORE) 
+  RUNNING @join__enumValue(graph: NEO4J) 
   """
   Finished without trouble.
   """
-  SUCCEEDED @join__enumValue(graph: STORE) 
+  SUCCEEDED @join__enumValue(graph: NEO4J) 
   """
   Finished, but Aura asked us to slow down and we retried.
   """
-  SLOWED @join__enumValue(graph: STORE) 
+  SLOWED @join__enumValue(graph: NEO4J) 
   """
   Stopped with an error.
   """
-  FAILED @join__enumValue(graph: STORE) 
+  FAILED @join__enumValue(graph: NEO4J) 
 }
 
 """
@@ -1731,7 +1737,7 @@ input InstanceCreate @join__type(graph: AURA)  {
   graphAnalyticsPlugin: Boolean
 }
 
-input AuraAccountRelationshipFilters @join__type(graph: STORE)  {
+input AuraAccountRelationshipFilters @join__type(graph: NEO4J)  {
   """
   Filter type where all of the related AuraAccounts match this filter
   """
@@ -1753,7 +1759,7 @@ input AuraAccountRelationshipFilters @join__type(graph: STORE)  {
 """
 Fields to sort AuraAccounts by. The order in which sorts are applied is not guaranteed when specifying many fields in one AuraAccountSort object.
 """
-input AuraAccountSort @join__type(graph: STORE)  {
+input AuraAccountSort @join__type(graph: NEO4J)  {
   id: SortDirection
   label: SortDirection
   clientIdHint: SortDirection
@@ -1762,7 +1768,7 @@ input AuraAccountSort @join__type(graph: STORE)  {
   lastSyncAt: SortDirection
 }
 
-input AuraAccountTenantsAggregateInput @join__type(graph: STORE)  {
+input AuraAccountTenantsAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -1785,7 +1791,7 @@ input AuraAccountTenantsAggregateInput @join__type(graph: STORE)  {
   node: AuraAccountTenantsNodeAggregationWhereInput
 }
 
-input AuraAccountTenantsConnectionAggregateInput @join__type(graph: STORE)  {
+input AuraAccountTenantsConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [AuraAccountTenantsConnectionAggregateInput!]
   OR: [AuraAccountTenantsConnectionAggregateInput!]
@@ -1793,7 +1799,7 @@ input AuraAccountTenantsConnectionAggregateInput @join__type(graph: STORE)  {
   node: AuraAccountTenantsNodeAggregationWhereInput
 }
 
-input AuraAccountTenantsConnectionFilters @join__type(graph: STORE)  {
+input AuraAccountTenantsConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return AuraAccounts where all of the related AuraAccountTenantsConnections match this filter
   """
@@ -1816,18 +1822,18 @@ input AuraAccountTenantsConnectionFilters @join__type(graph: STORE)  {
   aggregate: AuraAccountTenantsConnectionAggregateInput
 }
 
-input AuraAccountTenantsConnectionSort @join__type(graph: STORE)  {
+input AuraAccountTenantsConnectionSort @join__type(graph: NEO4J)  {
   node: TenantSort
 }
 
-input AuraAccountTenantsConnectionWhere @join__type(graph: STORE)  {
+input AuraAccountTenantsConnectionWhere @join__type(graph: NEO4J)  {
   AND: [AuraAccountTenantsConnectionWhere!]
   OR: [AuraAccountTenantsConnectionWhere!]
   NOT: AuraAccountTenantsConnectionWhere
   node: TenantWhere
 }
 
-input AuraAccountTenantsNodeAggregationWhereInput @join__type(graph: STORE)  {
+input AuraAccountTenantsNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [AuraAccountTenantsNodeAggregationWhereInput!]
   OR: [AuraAccountTenantsNodeAggregationWhereInput!]
   NOT: AuraAccountTenantsNodeAggregationWhereInput
@@ -2017,7 +2023,7 @@ input AuraAccountTenantsNodeAggregationWhereInput @join__type(graph: STORE)  {
   syncedAt: StringScalarAggregationFilters
 }
 
-input AuraAccountWhere @join__type(graph: STORE)  {
+input AuraAccountWhere @join__type(graph: NEO4J)  {
   id: IDScalarFilters
   id_EQ: ID @deprecated(reason: "Please use the relevant generic filter id: { eq: ... }") 
   id_IN: [ID!] @deprecated(reason: "Please use the relevant generic filter id: { in: ... }") 
@@ -2130,11 +2136,11 @@ input AuraAccountWhere @join__type(graph: STORE)  {
 """
 Boolean filters
 """
-input BooleanScalarFilters @join__type(graph: STORE)  {
+input BooleanScalarFilters @join__type(graph: NEO4J)  {
   eq: Boolean
 }
 
-input CloudProviderInstancesAggregateInput @join__type(graph: STORE)  {
+input CloudProviderInstancesAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -2157,7 +2163,7 @@ input CloudProviderInstancesAggregateInput @join__type(graph: STORE)  {
   node: CloudProviderInstancesNodeAggregationWhereInput
 }
 
-input CloudProviderInstancesConnectionAggregateInput @join__type(graph: STORE)  {
+input CloudProviderInstancesConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [CloudProviderInstancesConnectionAggregateInput!]
   OR: [CloudProviderInstancesConnectionAggregateInput!]
@@ -2165,7 +2171,7 @@ input CloudProviderInstancesConnectionAggregateInput @join__type(graph: STORE)  
   node: CloudProviderInstancesNodeAggregationWhereInput
 }
 
-input CloudProviderInstancesConnectionFilters @join__type(graph: STORE)  {
+input CloudProviderInstancesConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return CloudProviders where all of the related CloudProviderInstancesConnections match this filter
   """
@@ -2188,18 +2194,18 @@ input CloudProviderInstancesConnectionFilters @join__type(graph: STORE)  {
   aggregate: CloudProviderInstancesConnectionAggregateInput
 }
 
-input CloudProviderInstancesConnectionSort @join__type(graph: STORE)  {
+input CloudProviderInstancesConnectionSort @join__type(graph: NEO4J)  {
   node: InstanceSort
 }
 
-input CloudProviderInstancesConnectionWhere @join__type(graph: STORE)  {
+input CloudProviderInstancesConnectionWhere @join__type(graph: NEO4J)  {
   AND: [CloudProviderInstancesConnectionWhere!]
   OR: [CloudProviderInstancesConnectionWhere!]
   NOT: CloudProviderInstancesConnectionWhere
   node: InstanceWhere
 }
 
-input CloudProviderInstancesNodeAggregationWhereInput @join__type(graph: STORE)  {
+input CloudProviderInstancesNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [CloudProviderInstancesNodeAggregationWhereInput!]
   OR: [CloudProviderInstancesNodeAggregationWhereInput!]
   NOT: CloudProviderInstancesNodeAggregationWhereInput
@@ -3002,7 +3008,7 @@ input CloudProviderInstancesNodeAggregationWhereInput @join__type(graph: STORE) 
   deletedInAuraAt: StringScalarAggregationFilters
 }
 
-input CloudProviderRelationshipFilters @join__type(graph: STORE)  {
+input CloudProviderRelationshipFilters @join__type(graph: NEO4J)  {
   """
   Filter type where all of the related CloudProviders match this filter
   """
@@ -3024,11 +3030,11 @@ input CloudProviderRelationshipFilters @join__type(graph: STORE)  {
 """
 Fields to sort CloudProviders by. The order in which sorts are applied is not guaranteed when specifying many fields in one CloudProviderSort object.
 """
-input CloudProviderSort @join__type(graph: STORE)  {
+input CloudProviderSort @join__type(graph: NEO4J)  {
   name: SortDirection
 }
 
-input CloudProviderWhere @join__type(graph: STORE)  {
+input CloudProviderWhere @join__type(graph: NEO4J)  {
   name: StringScalarFilters
   name_EQ: String @deprecated(reason: "Please use the relevant generic filter name: { eq: ... }") 
   name_IN: [String!] @deprecated(reason: "Please use the relevant generic filter name: { in: ... }") 
@@ -3093,7 +3099,7 @@ input CloudProviderWhere @join__type(graph: STORE)  {
   )
 }
 
-input ConnectionAggregationCountFilterInput @join__type(graph: STORE)  {
+input ConnectionAggregationCountFilterInput @join__type(graph: NEO4J)  {
   nodes: IntScalarFilters
   edges: IntScalarFilters
 }
@@ -3101,7 +3107,7 @@ input ConnectionAggregationCountFilterInput @join__type(graph: STORE)  {
 """
 ConnectionStatus filters
 """
-input ConnectionStatusEnumScalarFilters @join__type(graph: STORE)  {
+input ConnectionStatusEnumScalarFilters @join__type(graph: NEO4J)  {
   eq: ConnectionStatus
   in: [ConnectionStatus!]
 }
@@ -3109,7 +3115,7 @@ input ConnectionStatusEnumScalarFilters @join__type(graph: STORE)  {
 """
 Float filters
 """
-input FloatScalarFilters @join__type(graph: STORE)  {
+input FloatScalarFilters @join__type(graph: NEO4J)  {
   eq: Float
   gt: Float
   gte: Float
@@ -3121,7 +3127,7 @@ input FloatScalarFilters @join__type(graph: STORE)  {
 """
 ID filters
 """
-input IDScalarFilters @join__type(graph: STORE)  {
+input IDScalarFilters @join__type(graph: NEO4J)  {
   eq: ID
   in: [ID!]
   contains: ID
@@ -3129,7 +3135,7 @@ input IDScalarFilters @join__type(graph: STORE)  {
   startsWith: ID
 }
 
-input InstanceCloudAggregateInput @join__type(graph: STORE)  {
+input InstanceCloudAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -3152,7 +3158,7 @@ input InstanceCloudAggregateInput @join__type(graph: STORE)  {
   node: InstanceCloudNodeAggregationWhereInput
 }
 
-input InstanceCloudConnectionAggregateInput @join__type(graph: STORE)  {
+input InstanceCloudConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [InstanceCloudConnectionAggregateInput!]
   OR: [InstanceCloudConnectionAggregateInput!]
@@ -3160,7 +3166,7 @@ input InstanceCloudConnectionAggregateInput @join__type(graph: STORE)  {
   node: InstanceCloudNodeAggregationWhereInput
 }
 
-input InstanceCloudConnectionFilters @join__type(graph: STORE)  {
+input InstanceCloudConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Instances where all of the related InstanceCloudConnections match this filter
   """
@@ -3183,18 +3189,18 @@ input InstanceCloudConnectionFilters @join__type(graph: STORE)  {
   aggregate: InstanceCloudConnectionAggregateInput
 }
 
-input InstanceCloudConnectionSort @join__type(graph: STORE)  {
+input InstanceCloudConnectionSort @join__type(graph: NEO4J)  {
   node: CloudProviderSort
 }
 
-input InstanceCloudConnectionWhere @join__type(graph: STORE)  {
+input InstanceCloudConnectionWhere @join__type(graph: NEO4J)  {
   AND: [InstanceCloudConnectionWhere!]
   OR: [InstanceCloudConnectionWhere!]
   NOT: InstanceCloudConnectionWhere
   node: CloudProviderWhere
 }
 
-input InstanceCloudNodeAggregationWhereInput @join__type(graph: STORE)  {
+input InstanceCloudNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [InstanceCloudNodeAggregationWhereInput!]
   OR: [InstanceCloudNodeAggregationWhereInput!]
   NOT: InstanceCloudNodeAggregationWhereInput
@@ -3246,7 +3252,7 @@ input InstanceCloudNodeAggregationWhereInput @join__type(graph: STORE)  {
   name: StringScalarAggregationFilters
 }
 
-input InstanceConfigurationRelationshipFilters @join__type(graph: STORE)  {
+input InstanceConfigurationRelationshipFilters @join__type(graph: NEO4J)  {
   """
   Filter type where all of the related InstanceConfigurations match this filter
   """
@@ -3268,7 +3274,7 @@ input InstanceConfigurationRelationshipFilters @join__type(graph: STORE)  {
 """
 Fields to sort InstanceConfigurations by. The order in which sorts are applied is not guaranteed when specifying many fields in one InstanceConfigurationSort object.
 """
-input InstanceConfigurationSort @join__type(graph: STORE)  {
+input InstanceConfigurationSort @join__type(graph: NEO4J)  {
   key: SortDirection
   cloudProvider: SortDirection
   region: SortDirection
@@ -3280,7 +3286,7 @@ input InstanceConfigurationSort @join__type(graph: STORE)  {
   syncedAt: SortDirection
 }
 
-input InstanceConfigurationTenantAggregateInput @join__type(graph: STORE)  {
+input InstanceConfigurationTenantAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -3303,7 +3309,7 @@ input InstanceConfigurationTenantAggregateInput @join__type(graph: STORE)  {
   node: InstanceConfigurationTenantNodeAggregationWhereInput
 }
 
-input InstanceConfigurationTenantConnectionAggregateInput @join__type(graph: STORE)  {
+input InstanceConfigurationTenantConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [InstanceConfigurationTenantConnectionAggregateInput!]
   OR: [InstanceConfigurationTenantConnectionAggregateInput!]
@@ -3311,7 +3317,7 @@ input InstanceConfigurationTenantConnectionAggregateInput @join__type(graph: STO
   node: InstanceConfigurationTenantNodeAggregationWhereInput
 }
 
-input InstanceConfigurationTenantConnectionFilters @join__type(graph: STORE)  {
+input InstanceConfigurationTenantConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return InstanceConfigurations where all of the related InstanceConfigurationTenantConnections match this filter
   """
@@ -3334,18 +3340,18 @@ input InstanceConfigurationTenantConnectionFilters @join__type(graph: STORE)  {
   aggregate: InstanceConfigurationTenantConnectionAggregateInput
 }
 
-input InstanceConfigurationTenantConnectionSort @join__type(graph: STORE)  {
+input InstanceConfigurationTenantConnectionSort @join__type(graph: NEO4J)  {
   node: TenantSort
 }
 
-input InstanceConfigurationTenantConnectionWhere @join__type(graph: STORE)  {
+input InstanceConfigurationTenantConnectionWhere @join__type(graph: NEO4J)  {
   AND: [InstanceConfigurationTenantConnectionWhere!]
   OR: [InstanceConfigurationTenantConnectionWhere!]
   NOT: InstanceConfigurationTenantConnectionWhere
   node: TenantWhere
 }
 
-input InstanceConfigurationTenantNodeAggregationWhereInput @join__type(graph: STORE)  {
+input InstanceConfigurationTenantNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [InstanceConfigurationTenantNodeAggregationWhereInput!]
   OR: [InstanceConfigurationTenantNodeAggregationWhereInput!]
   NOT: InstanceConfigurationTenantNodeAggregationWhereInput
@@ -3535,7 +3541,7 @@ input InstanceConfigurationTenantNodeAggregationWhereInput @join__type(graph: ST
   syncedAt: StringScalarAggregationFilters
 }
 
-input InstanceConfigurationWhere @join__type(graph: STORE)  {
+input InstanceConfigurationWhere @join__type(graph: NEO4J)  {
   key: StringScalarFilters
   key_EQ: String @deprecated(reason: "Please use the relevant generic filter key: { eq: ... }") 
   key_IN: [String!] @deprecated(reason: "Please use the relevant generic filter key: { in: ... }") 
@@ -3662,7 +3668,7 @@ input InstanceConfigurationWhere @join__type(graph: STORE)  {
   )
 }
 
-input InstanceOperationsAggregateInput @join__type(graph: STORE)  {
+input InstanceOperationsAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -3685,7 +3691,7 @@ input InstanceOperationsAggregateInput @join__type(graph: STORE)  {
   node: InstanceOperationsNodeAggregationWhereInput
 }
 
-input InstanceOperationsConnectionAggregateInput @join__type(graph: STORE)  {
+input InstanceOperationsConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [InstanceOperationsConnectionAggregateInput!]
   OR: [InstanceOperationsConnectionAggregateInput!]
@@ -3693,7 +3699,7 @@ input InstanceOperationsConnectionAggregateInput @join__type(graph: STORE)  {
   node: InstanceOperationsNodeAggregationWhereInput
 }
 
-input InstanceOperationsConnectionFilters @join__type(graph: STORE)  {
+input InstanceOperationsConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Instances where all of the related InstanceOperationsConnections match this filter
   """
@@ -3716,18 +3722,18 @@ input InstanceOperationsConnectionFilters @join__type(graph: STORE)  {
   aggregate: InstanceOperationsConnectionAggregateInput
 }
 
-input InstanceOperationsConnectionSort @join__type(graph: STORE)  {
+input InstanceOperationsConnectionSort @join__type(graph: NEO4J)  {
   node: OperationSort
 }
 
-input InstanceOperationsConnectionWhere @join__type(graph: STORE)  {
+input InstanceOperationsConnectionWhere @join__type(graph: NEO4J)  {
   AND: [InstanceOperationsConnectionWhere!]
   OR: [InstanceOperationsConnectionWhere!]
   NOT: InstanceOperationsConnectionWhere
   node: OperationWhere
 }
 
-input InstanceOperationsNodeAggregationWhereInput @join__type(graph: STORE)  {
+input InstanceOperationsNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [InstanceOperationsNodeAggregationWhereInput!]
   OR: [InstanceOperationsNodeAggregationWhereInput!]
   NOT: InstanceOperationsNodeAggregationWhereInput
@@ -4193,7 +4199,7 @@ input InstanceOperationsNodeAggregationWhereInput @join__type(graph: STORE)  {
   error: StringScalarAggregationFilters
 }
 
-input InstanceRelationshipFilters @join__type(graph: STORE)  {
+input InstanceRelationshipFilters @join__type(graph: NEO4J)  {
   """
   Filter type where all of the related Instances match this filter
   """
@@ -4215,7 +4221,7 @@ input InstanceRelationshipFilters @join__type(graph: STORE)  {
 """
 Fields to sort Instances by. The order in which sorts are applied is not guaranteed when specifying many fields in one InstanceSort object.
 """
-input InstanceSort @join__type(graph: STORE)  {
+input InstanceSort @join__type(graph: NEO4J)  {
   auraId: SortDirection
   name: SortDirection
   status: SortDirection
@@ -4244,12 +4250,12 @@ input InstanceSort @join__type(graph: STORE)  {
 """
 InstanceStatusGroup filters
 """
-input InstanceStatusGroupEnumScalarFilters @join__type(graph: STORE)  {
+input InstanceStatusGroupEnumScalarFilters @join__type(graph: NEO4J)  {
   eq: InstanceStatusGroup
   in: [InstanceStatusGroup!]
 }
 
-input InstanceTenantAggregateInput @join__type(graph: STORE)  {
+input InstanceTenantAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -4272,7 +4278,7 @@ input InstanceTenantAggregateInput @join__type(graph: STORE)  {
   node: InstanceTenantNodeAggregationWhereInput
 }
 
-input InstanceTenantConnectionAggregateInput @join__type(graph: STORE)  {
+input InstanceTenantConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [InstanceTenantConnectionAggregateInput!]
   OR: [InstanceTenantConnectionAggregateInput!]
@@ -4280,7 +4286,7 @@ input InstanceTenantConnectionAggregateInput @join__type(graph: STORE)  {
   node: InstanceTenantNodeAggregationWhereInput
 }
 
-input InstanceTenantConnectionFilters @join__type(graph: STORE)  {
+input InstanceTenantConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Instances where all of the related InstanceTenantConnections match this filter
   """
@@ -4303,18 +4309,18 @@ input InstanceTenantConnectionFilters @join__type(graph: STORE)  {
   aggregate: InstanceTenantConnectionAggregateInput
 }
 
-input InstanceTenantConnectionSort @join__type(graph: STORE)  {
+input InstanceTenantConnectionSort @join__type(graph: NEO4J)  {
   node: TenantSort
 }
 
-input InstanceTenantConnectionWhere @join__type(graph: STORE)  {
+input InstanceTenantConnectionWhere @join__type(graph: NEO4J)  {
   AND: [InstanceTenantConnectionWhere!]
   OR: [InstanceTenantConnectionWhere!]
   NOT: InstanceTenantConnectionWhere
   node: TenantWhere
 }
 
-input InstanceTenantNodeAggregationWhereInput @join__type(graph: STORE)  {
+input InstanceTenantNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [InstanceTenantNodeAggregationWhereInput!]
   OR: [InstanceTenantNodeAggregationWhereInput!]
   NOT: InstanceTenantNodeAggregationWhereInput
@@ -4504,7 +4510,7 @@ input InstanceTenantNodeAggregationWhereInput @join__type(graph: STORE)  {
   syncedAt: StringScalarAggregationFilters
 }
 
-input InstanceTierAggregateInput @join__type(graph: STORE)  {
+input InstanceTierAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -4527,7 +4533,7 @@ input InstanceTierAggregateInput @join__type(graph: STORE)  {
   node: InstanceTierNodeAggregationWhereInput
 }
 
-input InstanceTierConnectionAggregateInput @join__type(graph: STORE)  {
+input InstanceTierConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [InstanceTierConnectionAggregateInput!]
   OR: [InstanceTierConnectionAggregateInput!]
@@ -4535,7 +4541,7 @@ input InstanceTierConnectionAggregateInput @join__type(graph: STORE)  {
   node: InstanceTierNodeAggregationWhereInput
 }
 
-input InstanceTierConnectionFilters @join__type(graph: STORE)  {
+input InstanceTierConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Instances where all of the related InstanceTierConnections match this filter
   """
@@ -4558,18 +4564,18 @@ input InstanceTierConnectionFilters @join__type(graph: STORE)  {
   aggregate: InstanceTierConnectionAggregateInput
 }
 
-input InstanceTierConnectionSort @join__type(graph: STORE)  {
+input InstanceTierConnectionSort @join__type(graph: NEO4J)  {
   node: TierSort
 }
 
-input InstanceTierConnectionWhere @join__type(graph: STORE)  {
+input InstanceTierConnectionWhere @join__type(graph: NEO4J)  {
   AND: [InstanceTierConnectionWhere!]
   OR: [InstanceTierConnectionWhere!]
   NOT: InstanceTierConnectionWhere
   node: TierWhere
 }
 
-input InstanceTierNodeAggregationWhereInput @join__type(graph: STORE)  {
+input InstanceTierNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [InstanceTierNodeAggregationWhereInput!]
   OR: [InstanceTierNodeAggregationWhereInput!]
   NOT: InstanceTierNodeAggregationWhereInput
@@ -4667,7 +4673,7 @@ input InstanceTierNodeAggregationWhereInput @join__type(graph: STORE)  {
   label: StringScalarAggregationFilters
 }
 
-input InstanceWhere @join__type(graph: STORE)  {
+input InstanceWhere @join__type(graph: NEO4J)  {
   auraId: StringScalarFilters
   auraId_EQ: String @deprecated(reason: "Please use the relevant generic filter auraId: { eq: ... }") 
   auraId_IN: [String!] @deprecated(reason: "Please use the relevant generic filter auraId: { in: ... }") 
@@ -5113,7 +5119,7 @@ input InstanceWhere @join__type(graph: STORE)  {
 """
 Filters for an aggregation of an int field
 """
-input IntScalarAggregationFilters @join__type(graph: STORE)  {
+input IntScalarAggregationFilters @join__type(graph: NEO4J)  {
   average: FloatScalarFilters
   max: IntScalarFilters
   min: IntScalarFilters
@@ -5123,7 +5129,7 @@ input IntScalarAggregationFilters @join__type(graph: STORE)  {
 """
 Int filters
 """
-input IntScalarFilters @join__type(graph: STORE)  {
+input IntScalarFilters @join__type(graph: NEO4J)  {
   eq: Int
   gt: Int
   gte: Int
@@ -5135,12 +5141,12 @@ input IntScalarFilters @join__type(graph: STORE)  {
 """
 OperationKind filters
 """
-input OperationKindEnumScalarFilters @join__type(graph: STORE)  {
+input OperationKindEnumScalarFilters @join__type(graph: NEO4J)  {
   eq: OperationKind
   in: [OperationKind!]
 }
 
-input OperationRelationshipFilters @join__type(graph: STORE)  {
+input OperationRelationshipFilters @join__type(graph: NEO4J)  {
   """
   Filter type where all of the related Operations match this filter
   """
@@ -5162,7 +5168,7 @@ input OperationRelationshipFilters @join__type(graph: STORE)  {
 """
 Fields to sort Operations by. The order in which sorts are applied is not guaranteed when specifying many fields in one OperationSort object.
 """
-input OperationSort @join__type(graph: STORE)  {
+input OperationSort @join__type(graph: NEO4J)  {
   id: SortDirection
   kind: SortDirection
   status: SortDirection
@@ -5181,12 +5187,12 @@ input OperationSort @join__type(graph: STORE)  {
 """
 OperationStatus filters
 """
-input OperationStatusEnumScalarFilters @join__type(graph: STORE)  {
+input OperationStatusEnumScalarFilters @join__type(graph: NEO4J)  {
   eq: OperationStatus
   in: [OperationStatus!]
 }
 
-input OperationStepOperationAggregateInput @join__type(graph: STORE)  {
+input OperationStepOperationAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -5209,7 +5215,7 @@ input OperationStepOperationAggregateInput @join__type(graph: STORE)  {
   node: OperationStepOperationNodeAggregationWhereInput
 }
 
-input OperationStepOperationConnectionAggregateInput @join__type(graph: STORE)  {
+input OperationStepOperationConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [OperationStepOperationConnectionAggregateInput!]
   OR: [OperationStepOperationConnectionAggregateInput!]
@@ -5217,7 +5223,7 @@ input OperationStepOperationConnectionAggregateInput @join__type(graph: STORE)  
   node: OperationStepOperationNodeAggregationWhereInput
 }
 
-input OperationStepOperationConnectionFilters @join__type(graph: STORE)  {
+input OperationStepOperationConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return OperationSteps where all of the related OperationStepOperationConnections match this filter
   """
@@ -5240,18 +5246,18 @@ input OperationStepOperationConnectionFilters @join__type(graph: STORE)  {
   aggregate: OperationStepOperationConnectionAggregateInput
 }
 
-input OperationStepOperationConnectionSort @join__type(graph: STORE)  {
+input OperationStepOperationConnectionSort @join__type(graph: NEO4J)  {
   node: OperationSort
 }
 
-input OperationStepOperationConnectionWhere @join__type(graph: STORE)  {
+input OperationStepOperationConnectionWhere @join__type(graph: NEO4J)  {
   AND: [OperationStepOperationConnectionWhere!]
   OR: [OperationStepOperationConnectionWhere!]
   NOT: OperationStepOperationConnectionWhere
   node: OperationWhere
 }
 
-input OperationStepOperationNodeAggregationWhereInput @join__type(graph: STORE)  {
+input OperationStepOperationNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [OperationStepOperationNodeAggregationWhereInput!]
   OR: [OperationStepOperationNodeAggregationWhereInput!]
   NOT: OperationStepOperationNodeAggregationWhereInput
@@ -5717,7 +5723,7 @@ input OperationStepOperationNodeAggregationWhereInput @join__type(graph: STORE) 
   error: StringScalarAggregationFilters
 }
 
-input OperationStepRelationshipFilters @join__type(graph: STORE)  {
+input OperationStepRelationshipFilters @join__type(graph: NEO4J)  {
   """
   Filter type where all of the related OperationSteps match this filter
   """
@@ -5736,7 +5742,7 @@ input OperationStepRelationshipFilters @join__type(graph: STORE)  {
   some: OperationStepWhere
 }
 
-input OperationStepsAggregateInput @join__type(graph: STORE)  {
+input OperationStepsAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -5759,7 +5765,7 @@ input OperationStepsAggregateInput @join__type(graph: STORE)  {
   node: OperationStepsNodeAggregationWhereInput
 }
 
-input OperationStepsConnectionAggregateInput @join__type(graph: STORE)  {
+input OperationStepsConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [OperationStepsConnectionAggregateInput!]
   OR: [OperationStepsConnectionAggregateInput!]
@@ -5767,7 +5773,7 @@ input OperationStepsConnectionAggregateInput @join__type(graph: STORE)  {
   node: OperationStepsNodeAggregationWhereInput
 }
 
-input OperationStepsConnectionFilters @join__type(graph: STORE)  {
+input OperationStepsConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Operations where all of the related OperationStepsConnections match this filter
   """
@@ -5790,18 +5796,18 @@ input OperationStepsConnectionFilters @join__type(graph: STORE)  {
   aggregate: OperationStepsConnectionAggregateInput
 }
 
-input OperationStepsConnectionSort @join__type(graph: STORE)  {
+input OperationStepsConnectionSort @join__type(graph: NEO4J)  {
   node: OperationStepSort
 }
 
-input OperationStepsConnectionWhere @join__type(graph: STORE)  {
+input OperationStepsConnectionWhere @join__type(graph: NEO4J)  {
   AND: [OperationStepsConnectionWhere!]
   OR: [OperationStepsConnectionWhere!]
   NOT: OperationStepsConnectionWhere
   node: OperationStepWhere
 }
 
-input OperationStepsNodeAggregationWhereInput @join__type(graph: STORE)  {
+input OperationStepsNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [OperationStepsNodeAggregationWhereInput!]
   OR: [OperationStepsNodeAggregationWhereInput!]
   NOT: OperationStepsNodeAggregationWhereInput
@@ -6009,7 +6015,7 @@ input OperationStepsNodeAggregationWhereInput @join__type(graph: STORE)  {
 """
 Fields to sort OperationSteps by. The order in which sorts are applied is not guaranteed when specifying many fields in one OperationStepSort object.
 """
-input OperationStepSort @join__type(graph: STORE)  {
+input OperationStepSort @join__type(graph: NEO4J)  {
   seq: SortDirection
   label: SortDirection
   status: SortDirection
@@ -6017,7 +6023,7 @@ input OperationStepSort @join__type(graph: STORE)  {
   detail: SortDirection
 }
 
-input OperationStepWhere @join__type(graph: STORE)  {
+input OperationStepWhere @join__type(graph: NEO4J)  {
   seq: IntScalarFilters
   seq_EQ: Int @deprecated(reason: "Please use the relevant generic filter seq: { eq: ... }") 
   seq_IN: [Int!] @deprecated(reason: "Please use the relevant generic filter seq: { in: ... }") 
@@ -6104,7 +6110,7 @@ input OperationStepWhere @join__type(graph: STORE)  {
   )
 }
 
-input OperationTargetAggregateInput @join__type(graph: STORE)  {
+input OperationTargetAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -6127,7 +6133,7 @@ input OperationTargetAggregateInput @join__type(graph: STORE)  {
   node: OperationTargetNodeAggregationWhereInput
 }
 
-input OperationTargetConnectionAggregateInput @join__type(graph: STORE)  {
+input OperationTargetConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [OperationTargetConnectionAggregateInput!]
   OR: [OperationTargetConnectionAggregateInput!]
@@ -6135,7 +6141,7 @@ input OperationTargetConnectionAggregateInput @join__type(graph: STORE)  {
   node: OperationTargetNodeAggregationWhereInput
 }
 
-input OperationTargetConnectionFilters @join__type(graph: STORE)  {
+input OperationTargetConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Operations where all of the related OperationTargetConnections match this filter
   """
@@ -6158,18 +6164,18 @@ input OperationTargetConnectionFilters @join__type(graph: STORE)  {
   aggregate: OperationTargetConnectionAggregateInput
 }
 
-input OperationTargetConnectionSort @join__type(graph: STORE)  {
+input OperationTargetConnectionSort @join__type(graph: NEO4J)  {
   node: InstanceSort
 }
 
-input OperationTargetConnectionWhere @join__type(graph: STORE)  {
+input OperationTargetConnectionWhere @join__type(graph: NEO4J)  {
   AND: [OperationTargetConnectionWhere!]
   OR: [OperationTargetConnectionWhere!]
   NOT: OperationTargetConnectionWhere
   node: InstanceWhere
 }
 
-input OperationTargetNodeAggregationWhereInput @join__type(graph: STORE)  {
+input OperationTargetNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [OperationTargetNodeAggregationWhereInput!]
   OR: [OperationTargetNodeAggregationWhereInput!]
   NOT: OperationTargetNodeAggregationWhereInput
@@ -6972,7 +6978,7 @@ input OperationTargetNodeAggregationWhereInput @join__type(graph: STORE)  {
   deletedInAuraAt: StringScalarAggregationFilters
 }
 
-input OperationWhere @join__type(graph: STORE)  {
+input OperationWhere @join__type(graph: NEO4J)  {
   id: IDScalarFilters
   id_EQ: ID @deprecated(reason: "Please use the relevant generic filter id: { eq: ... }") 
   id_IN: [ID!] @deprecated(reason: "Please use the relevant generic filter id: { in: ... }") 
@@ -7187,7 +7193,7 @@ input OperationWhere @join__type(graph: STORE)  {
 """
 StepStatus filters
 """
-input StepStatusEnumScalarFilters @join__type(graph: STORE)  {
+input StepStatusEnumScalarFilters @join__type(graph: NEO4J)  {
   eq: StepStatus
   in: [StepStatus!]
 }
@@ -7195,7 +7201,7 @@ input StepStatusEnumScalarFilters @join__type(graph: STORE)  {
 """
 Filters for an aggregation of a string field
 """
-input StringScalarAggregationFilters @join__type(graph: STORE)  {
+input StringScalarAggregationFilters @join__type(graph: NEO4J)  {
   averageLength: FloatScalarFilters
   shortestLength: IntScalarFilters
   longestLength: IntScalarFilters
@@ -7204,7 +7210,7 @@ input StringScalarAggregationFilters @join__type(graph: STORE)  {
 """
 String filters
 """
-input StringScalarFilters @join__type(graph: STORE)  {
+input StringScalarFilters @join__type(graph: NEO4J)  {
   eq: String
   in: [String!]
   contains: String
@@ -7215,7 +7221,7 @@ input StringScalarFilters @join__type(graph: STORE)  {
 """
 Fields to sort SyncRuns by. The order in which sorts are applied is not guaranteed when specifying many fields in one SyncRunSort object.
 """
-input SyncRunSort @join__type(graph: STORE)  {
+input SyncRunSort @join__type(graph: NEO4J)  {
   id: SortDirection
   startedAt: SortDirection
   finishedAt: SortDirection
@@ -7228,7 +7234,7 @@ input SyncRunSort @join__type(graph: STORE)  {
   error: SortDirection
 }
 
-input SyncRunWhere @join__type(graph: STORE)  {
+input SyncRunWhere @join__type(graph: NEO4J)  {
   id: IDScalarFilters
   id_EQ: ID @deprecated(reason: "Please use the relevant generic filter id: { eq: ... }") 
   id_IN: [ID!] @deprecated(reason: "Please use the relevant generic filter id: { in: ... }") 
@@ -7307,12 +7313,12 @@ input SyncRunWhere @join__type(graph: STORE)  {
 """
 SyncStatus filters
 """
-input SyncStatusEnumScalarFilters @join__type(graph: STORE)  {
+input SyncStatusEnumScalarFilters @join__type(graph: NEO4J)  {
   eq: SyncStatus
   in: [SyncStatus!]
 }
 
-input TenantAccountAggregateInput @join__type(graph: STORE)  {
+input TenantAccountAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -7335,7 +7341,7 @@ input TenantAccountAggregateInput @join__type(graph: STORE)  {
   node: TenantAccountNodeAggregationWhereInput
 }
 
-input TenantAccountConnectionAggregateInput @join__type(graph: STORE)  {
+input TenantAccountConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [TenantAccountConnectionAggregateInput!]
   OR: [TenantAccountConnectionAggregateInput!]
@@ -7343,7 +7349,7 @@ input TenantAccountConnectionAggregateInput @join__type(graph: STORE)  {
   node: TenantAccountNodeAggregationWhereInput
 }
 
-input TenantAccountConnectionFilters @join__type(graph: STORE)  {
+input TenantAccountConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Tenants where all of the related TenantAccountConnections match this filter
   """
@@ -7366,18 +7372,18 @@ input TenantAccountConnectionFilters @join__type(graph: STORE)  {
   aggregate: TenantAccountConnectionAggregateInput
 }
 
-input TenantAccountConnectionSort @join__type(graph: STORE)  {
+input TenantAccountConnectionSort @join__type(graph: NEO4J)  {
   node: AuraAccountSort
 }
 
-input TenantAccountConnectionWhere @join__type(graph: STORE)  {
+input TenantAccountConnectionWhere @join__type(graph: NEO4J)  {
   AND: [TenantAccountConnectionWhere!]
   OR: [TenantAccountConnectionWhere!]
   NOT: TenantAccountConnectionWhere
   node: AuraAccountWhere
 }
 
-input TenantAccountNodeAggregationWhereInput @join__type(graph: STORE)  {
+input TenantAccountNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [TenantAccountNodeAggregationWhereInput!]
   OR: [TenantAccountNodeAggregationWhereInput!]
   NOT: TenantAccountNodeAggregationWhereInput
@@ -7567,7 +7573,7 @@ input TenantAccountNodeAggregationWhereInput @join__type(graph: STORE)  {
   lastSyncAt: StringScalarAggregationFilters
 }
 
-input TenantConfigurationsAggregateInput @join__type(graph: STORE)  {
+input TenantConfigurationsAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -7590,7 +7596,7 @@ input TenantConfigurationsAggregateInput @join__type(graph: STORE)  {
   node: TenantConfigurationsNodeAggregationWhereInput
 }
 
-input TenantConfigurationsConnectionAggregateInput @join__type(graph: STORE)  {
+input TenantConfigurationsConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [TenantConfigurationsConnectionAggregateInput!]
   OR: [TenantConfigurationsConnectionAggregateInput!]
@@ -7598,7 +7604,7 @@ input TenantConfigurationsConnectionAggregateInput @join__type(graph: STORE)  {
   node: TenantConfigurationsNodeAggregationWhereInput
 }
 
-input TenantConfigurationsConnectionFilters @join__type(graph: STORE)  {
+input TenantConfigurationsConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Tenants where all of the related TenantConfigurationsConnections match this filter
   """
@@ -7621,18 +7627,18 @@ input TenantConfigurationsConnectionFilters @join__type(graph: STORE)  {
   aggregate: TenantConfigurationsConnectionAggregateInput
 }
 
-input TenantConfigurationsConnectionSort @join__type(graph: STORE)  {
+input TenantConfigurationsConnectionSort @join__type(graph: NEO4J)  {
   node: InstanceConfigurationSort
 }
 
-input TenantConfigurationsConnectionWhere @join__type(graph: STORE)  {
+input TenantConfigurationsConnectionWhere @join__type(graph: NEO4J)  {
   AND: [TenantConfigurationsConnectionWhere!]
   OR: [TenantConfigurationsConnectionWhere!]
   NOT: TenantConfigurationsConnectionWhere
   node: InstanceConfigurationWhere
 }
 
-input TenantConfigurationsNodeAggregationWhereInput @join__type(graph: STORE)  {
+input TenantConfigurationsNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [TenantConfigurationsNodeAggregationWhereInput!]
   OR: [TenantConfigurationsNodeAggregationWhereInput!]
   NOT: TenantConfigurationsNodeAggregationWhereInput
@@ -8052,7 +8058,7 @@ input TenantConfigurationsNodeAggregationWhereInput @join__type(graph: STORE)  {
   syncedAt: StringScalarAggregationFilters
 }
 
-input TenantInstancesAggregateInput @join__type(graph: STORE)  {
+input TenantInstancesAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -8075,7 +8081,7 @@ input TenantInstancesAggregateInput @join__type(graph: STORE)  {
   node: TenantInstancesNodeAggregationWhereInput
 }
 
-input TenantInstancesConnectionAggregateInput @join__type(graph: STORE)  {
+input TenantInstancesConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [TenantInstancesConnectionAggregateInput!]
   OR: [TenantInstancesConnectionAggregateInput!]
@@ -8083,7 +8089,7 @@ input TenantInstancesConnectionAggregateInput @join__type(graph: STORE)  {
   node: TenantInstancesNodeAggregationWhereInput
 }
 
-input TenantInstancesConnectionFilters @join__type(graph: STORE)  {
+input TenantInstancesConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Tenants where all of the related TenantInstancesConnections match this filter
   """
@@ -8106,18 +8112,18 @@ input TenantInstancesConnectionFilters @join__type(graph: STORE)  {
   aggregate: TenantInstancesConnectionAggregateInput
 }
 
-input TenantInstancesConnectionSort @join__type(graph: STORE)  {
+input TenantInstancesConnectionSort @join__type(graph: NEO4J)  {
   node: InstanceSort
 }
 
-input TenantInstancesConnectionWhere @join__type(graph: STORE)  {
+input TenantInstancesConnectionWhere @join__type(graph: NEO4J)  {
   AND: [TenantInstancesConnectionWhere!]
   OR: [TenantInstancesConnectionWhere!]
   NOT: TenantInstancesConnectionWhere
   node: InstanceWhere
 }
 
-input TenantInstancesNodeAggregationWhereInput @join__type(graph: STORE)  {
+input TenantInstancesNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [TenantInstancesNodeAggregationWhereInput!]
   OR: [TenantInstancesNodeAggregationWhereInput!]
   NOT: TenantInstancesNodeAggregationWhereInput
@@ -8920,7 +8926,7 @@ input TenantInstancesNodeAggregationWhereInput @join__type(graph: STORE)  {
   deletedInAuraAt: StringScalarAggregationFilters
 }
 
-input TenantRelationshipFilters @join__type(graph: STORE)  {
+input TenantRelationshipFilters @join__type(graph: NEO4J)  {
   """
   Filter type where all of the related Tenants match this filter
   """
@@ -8942,14 +8948,14 @@ input TenantRelationshipFilters @join__type(graph: STORE)  {
 """
 Fields to sort Tenants by. The order in which sorts are applied is not guaranteed when specifying many fields in one TenantSort object.
 """
-input TenantSort @join__type(graph: STORE)  {
+input TenantSort @join__type(graph: NEO4J)  {
   auraId: SortDirection
   name: SortDirection
   configsSyncedAt: SortDirection
   syncedAt: SortDirection
 }
 
-input TenantWhere @join__type(graph: STORE)  {
+input TenantWhere @join__type(graph: NEO4J)  {
   auraId: StringScalarFilters
   auraId_EQ: String @deprecated(reason: "Please use the relevant generic filter auraId: { eq: ... }") 
   auraId_IN: [String!] @deprecated(reason: "Please use the relevant generic filter auraId: { in: ... }") 
@@ -9146,7 +9152,7 @@ input TenantWhere @join__type(graph: STORE)  {
   )
 }
 
-input TierInstancesAggregateInput @join__type(graph: STORE)  {
+input TierInstancesAggregateInput @join__type(graph: NEO4J)  {
   count_EQ: Int @deprecated(
     reason: "Please use the relevant generic filter '{ count: { eq: ... } } }' instead."
   )
@@ -9169,7 +9175,7 @@ input TierInstancesAggregateInput @join__type(graph: STORE)  {
   node: TierInstancesNodeAggregationWhereInput
 }
 
-input TierInstancesConnectionAggregateInput @join__type(graph: STORE)  {
+input TierInstancesConnectionAggregateInput @join__type(graph: NEO4J)  {
   count: ConnectionAggregationCountFilterInput
   AND: [TierInstancesConnectionAggregateInput!]
   OR: [TierInstancesConnectionAggregateInput!]
@@ -9177,7 +9183,7 @@ input TierInstancesConnectionAggregateInput @join__type(graph: STORE)  {
   node: TierInstancesNodeAggregationWhereInput
 }
 
-input TierInstancesConnectionFilters @join__type(graph: STORE)  {
+input TierInstancesConnectionFilters @join__type(graph: NEO4J)  {
   """
   Return Tiers where all of the related TierInstancesConnections match this filter
   """
@@ -9200,18 +9206,18 @@ input TierInstancesConnectionFilters @join__type(graph: STORE)  {
   aggregate: TierInstancesConnectionAggregateInput
 }
 
-input TierInstancesConnectionSort @join__type(graph: STORE)  {
+input TierInstancesConnectionSort @join__type(graph: NEO4J)  {
   node: InstanceSort
 }
 
-input TierInstancesConnectionWhere @join__type(graph: STORE)  {
+input TierInstancesConnectionWhere @join__type(graph: NEO4J)  {
   AND: [TierInstancesConnectionWhere!]
   OR: [TierInstancesConnectionWhere!]
   NOT: TierInstancesConnectionWhere
   node: InstanceWhere
 }
 
-input TierInstancesNodeAggregationWhereInput @join__type(graph: STORE)  {
+input TierInstancesNodeAggregationWhereInput @join__type(graph: NEO4J)  {
   AND: [TierInstancesNodeAggregationWhereInput!]
   OR: [TierInstancesNodeAggregationWhereInput!]
   NOT: TierInstancesNodeAggregationWhereInput
@@ -10014,7 +10020,7 @@ input TierInstancesNodeAggregationWhereInput @join__type(graph: STORE)  {
   deletedInAuraAt: StringScalarAggregationFilters
 }
 
-input TierRelationshipFilters @join__type(graph: STORE)  {
+input TierRelationshipFilters @join__type(graph: NEO4J)  {
   """
   Filter type where all of the related Tiers match this filter
   """
@@ -10036,12 +10042,12 @@ input TierRelationshipFilters @join__type(graph: STORE)  {
 """
 Fields to sort Tiers by. The order in which sorts are applied is not guaranteed when specifying many fields in one TierSort object.
 """
-input TierSort @join__type(graph: STORE)  {
+input TierSort @join__type(graph: NEO4J)  {
   type: SortDirection
   label: SortDirection
 }
 
-input TierWhere @join__type(graph: STORE)  {
+input TierWhere @join__type(graph: NEO4J)  {
   type: StringScalarFilters
   type_EQ: String @deprecated(reason: "Please use the relevant generic filter type: { eq: ... }") 
   type_IN: [String!] @deprecated(reason: "Please use the relevant generic filter type: { in: ... }") 

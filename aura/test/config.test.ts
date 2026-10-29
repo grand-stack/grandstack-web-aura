@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { loadConfig, parseSecretKey } from "../src/config.js";
 
 const key = randomBytes(32).toString("base64");
-const ok = { NEO4J_URI: "bolt://localhost:7687", NEO4J_PASSWORD: "pw", INTERNAL_TOKEN: "a-long-enough-token-1234", SECRET_KEY: key };
+const ok = { NEO4J_URI: "bolt://localhost:7687", NEO4J_PASSWORD: "pw", SECRET_KEY: key };
 
 describe("loadConfig", () => {
   it("applies the defaults, including the real Aura address", () => {
@@ -15,16 +15,12 @@ describe("loadConfig", () => {
       syncIntervalMs: 900_000,
       syncConcurrency: 3,
       accountId: "default",
-      storeInternalUrl: "http://store:4002/graphql",
+      storeWriterUrl: "http://store-writer:4000/graphql",
     });
   });
 
   it("names every missing required variable", () => {
-    expect(() => loadConfig({})).toThrow("NEO4J_URI, NEO4J_PASSWORD, INTERNAL_TOKEN, SECRET_KEY");
-  });
-
-  it("refuses a short internal token", () => {
-    expect(() => loadConfig({ ...ok, INTERNAL_TOKEN: "short" })).toThrow("at least 16 characters");
+    expect(() => loadConfig({})).toThrow("NEO4J_URI, NEO4J_PASSWORD, SECRET_KEY");
   });
 
   it("refuses a secret key that is not 32 bytes", () => {

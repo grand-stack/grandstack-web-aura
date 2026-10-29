@@ -14,7 +14,7 @@ What to change to make this look and behave like your own app, what each setting
 | `aura/src/crypto.ts`, `secrets.ts` | Generic | Sealing with an owner bound in, and secret nodes over Bolt. |
 | `aura/src/client.ts` | Mostly generic | A token manager, `Retry-After`, shared pause after a 429, no retry of a change. The paths are Aura's. |
 | `aura/src/sync.ts`, `status.ts` | Aura-specific | What Aura returns and how it maps to the store. |
-| `store/schema/schema.graphql` | Aura-specific | The graph model. |
+| `models/aura/` | Aura-specific | The graph model that `grandstack-server` loads with `MODEL=aura`: schema, setup Cypher, `model.json`. |
 | `edge/` | Generic | An nginx in front of any app on one origin. Change the two upstream names. |
 | `mock-aura/` | Aura-specific | Its contract test checks it against the real spec. |
 | `web/src/graphql/generated/*`, `aura/src/generated/*`, `gateway/supergraph.graphql` | Generated | Regenerate; never edit. |
@@ -37,52 +37,51 @@ What to change to make this look and behave like your own app, what each setting
 
 ## Settings
 
-### Compose (read from `.env` or the shell)
+### Compose (the `grandstack` repository, read from its `.env` or the shell)
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `SECRET_KEY` | required | 32 bytes, base64. Seals the client secret and instance passwords. Losing it means they cannot be opened. |
-| `NEO4J_PASSWORD` | required | The database password. |
-| `INTERNAL_TOKEN` | required | Bearer token for the store's internal endpoint (16 characters or more). |
-| `AURA_BASE_URL` | the fake Aura | `https://api.neo4j.io` for a real account. |
-| `WEB_BIND`, `WEB_PORT` | `127.0.0.1`, `3100` | Where the default plain HTTP app is published. `0.0.0.0` opens it to the network with no sign-in. |
-| `EDGE_BIND`, `EDGE_PORT` | `127.0.0.1`, `8443` | Where the edge is published (`compose.edge.yaml`). |
-| `PUBLIC_ORIGIN` | `http://localhost:3100` | The address the app is opened at, for the gateway's CORS list. Rarely matters, because the app calls its own origin. |
+| `SECRET_KEY` | required | 32 bytes, base64. Seals the client secret and instance passwords. Losing it means they cannot be opened. `scripts/init-env.sh` makes it. |
+| `NEO4J_PASSWORD` | `grandstack-dev` | The database password, as in every GRANDstack setup. |
+| `AURA_BASE_URL` | `https://api.neo4j.io` | The Aura API. The fake-Aura overlay fixes it to the fake. |
+| `ALLOW_INSECURE_AURA_URL` | unset | Lets `AURA_BASE_URL` be plain http. Only the fake-Aura overlay (`compose.aura-mock.yaml`) sets it. |
+| `SYNC_INTERVAL_MS` | `900000` | Time between automatic syncs. `0` turns the timer off. |
+| `MOCK_STEP_MS` | `3000` | How long each asynchronous step takes in mock-aura (the fake-Aura overlay only). |
+| `EDGE_BIND`, `EDGE_PORT` | `127.0.0.1`, `8443` | Where the edge is published (`compose.aura-edge.yaml`). `0.0.0.0` serves other machines. |
 | `EDGE_REQUEST_RATE`, `EDGE_MUTATION_RATE` | `20r/s`, `60r/m` | Per address. Mutations are POSTs; reads are GETs and are not held to the minute. |
 | `EDGE_HSTS` | empty | For example `max-age=31536000`, once there is a real hostname and certificate. It applies to a whole host, whatever the port. |
-| `MOCK_STEP_MS` | `3000` | How long each asynchronous step takes in mock-aura. |
 
-`scripts/init-env.sh` makes the first three. `--edge` adds the certificate and sign-in; `EDGE_SAN` and `--new-cert` reissue the certificate for other names; `EDGE_PASSWORD=... --new-password` sets the sign-in password yourself.
+`scripts/init-env.sh` (in this repository) writes `SECRET_KEY` into `../grandstack/.env`. `--edge` adds the certificate and sign-in; `EDGE_SAN` and `--new-cert` reissue the certificate for other names; `EDGE_PASSWORD=... --new-password` sets the sign-in password yourself.
 
-### The aura subgraph
+### The two servers (`grandstack-server`)
+
+Both run the same image with `MODEL=aura`, `MODELS_DIR=/app/models` (this repository's `models/` mounted read-only) and `FEDERATION=true`. The read-only one adds `READ_ONLY=true`. Every other setting is the server's own: see its [configuration](https://github.com/grand-stack/grandstack-server/blob/main/docs/configuration.md#models). The model sets the defaults (no seed, no counts plugin); `models/aura/model.json` holds only `{ "refreshCounts": false }`.
+
+### The Aura subgraph
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE` | required (user `neo4j`, database `neo4j`) | Bolt connection, used for secrets. |
-| `STORE_INTERNAL_URL` | `http://store:4002/graphql` | The store's internal endpoint. |
-| `SECRET_KEY_VERSION` | `1` | Which key sealed a value, for rotation. |
+| `STORE_WRITER_URL` | `http://store-writer:4000/graphql` | The writable server. |
+| `SECRET_KEY`, `SECRET_KEY_VERSION` | required, `1` | The key, and which key version seals new values (for rotation). |
 | `AURA_BASE_URL` | `https://api.neo4j.io` | Must be https, unless `ALLOW_INSECURE_AURA_URL=true` (for mock-aura). |
 | `SYNC_INTERVAL_MS` | `900000` | Time between automatic syncs. `0` turns the timer off. |
 | `SYNC_CONCURRENCY` | `3` | Instance detail requests in flight at once. |
 | `OPERATION_TIMEOUT_MS` | `1800000` | How long a change may take before it is given up on. The change may still finish. |
 | `PORT` | `4010` | |
 
-### The store
-
-`NEO4J_URI`, `NEO4J_PASSWORD`, `INTERNAL_TOKEN` are required. `PORT` (4001) and `INTERNAL_PORT` (4002) must differ, so the internal endpoint is never served on the public port. `SCHEMA_PATH` and `SETUP_CYPHER_PATH` say where the graph model and constraints are.
-
 ### The web app
 
-`VITE_GRAPHQL_URL` is fixed at **build time** and empty by default, which means `/graphql` on the app's own origin. Set it only to point the app somewhere else, and then it must be reachable from the browser. For `npm run dev -w web` the dev server proxies `/graphql` to `DEV_GATEWAY` (default `http://localhost:4100`, which `compose.dev.yaml` publishes).
+`VITE_GRAPHQL_URL` is fixed at **build time** and empty, which means `/graphql` on the app's own origin: the web server (or the edge) forwards it to the gateway, and the page's content security policy allows nothing else. Set it only to point the app somewhere else, and then the policy must allow that origin. For `npm run dev -w web` the dev server proxies `/graphql` to `DEV_GATEWAY` (default `http://localhost:4000`, where `compose.aura.yaml` publishes the gateway).
 
-## Use the fake Aura or a real one
+## The real Aura, and the fake for testing
 
-The stack uses mock-aura unless `AURA_BASE_URL` is set. Credentials for the fake are `mock-client` and `mock-secret`. For a real account set `AURA_BASE_URL=https://api.neo4j.io` and read [real-account-checklist.md](real-account-checklist.md) first: creates and deletes cost money and cannot be undone, and the browser test must never be pointed at a real account.
+The setup talks to the real Aura API (`https://api.neo4j.io`) by default: read [real-account-checklist.md](real-account-checklist.md) first, because creates and deletes cost money and cannot be undone. For development and tests add `compose.aura-mock.yaml` (in the `grandstack` repository), which starts mock-aura and fixes the Aura address to it, whatever `.env` says. Connect to the fake with `mock-client` and `mock-secret`. The browser test must never be pointed at a real account.
 
 ## Serve it to a phone or another machine
 
-Put the edge in front, make the certificate cover the address, and publish on the network. The commands are in [deploying.md](deploying.md) and the [README](../README.md#the-edge-tls-and-a-sign-in-to-reach-it-from-a-phone-or-another-machine). Do not use `WEB_BIND=0.0.0.0` for this; it has no sign-in.
+Put the edge in front (`compose.aura-edge.yaml`), make the certificate cover the address, and publish on the network. The commands are in [deploying.md](deploying.md) and the [README](../README.md#the-edge-tls-and-a-sign-in-to-reach-it-from-a-phone-or-another-machine). Do not publish the plain app to the network; it has no sign-in.
 
 ## Adapt the pattern to another API
 
-The reusable idea is: a **cache** in Neo4j that screens read, a **sync** that fills it, and **changes that are planned, reviewed, confirmed and then run once** by a reconciler. To adapt it, change the API client and its types (`aura/src/client.ts`, `generate:api`), the mapping into the store (`aura/src/sync.ts` and `store/schema/schema.graphql`), the kinds of change (`aura/src/operations/`), and the screens. The recipes list the files each of those touches: [recipes](recipes.md).
+The reusable idea is: a **cache** in Neo4j that screens read, a **sync** that fills it, and **changes that are planned, reviewed, confirmed and then run once** by a reconciler. To adapt it, change the API client and its types (`aura/src/client.ts`, `generate:api`), the mapping into the store (`aura/src/sync.ts` and `models/aura/schema.graphql`), the kinds of change (`aura/src/operations/`), and the screens. The recipes list the files each of those touches: [recipes](recipes.md).

@@ -4,7 +4,7 @@ import { AuraApiError, AuraAuthError, AuraClient } from "./client.js";
 import { UserError } from "./errors.js";
 import type { SecretStore } from "./secrets.js";
 import { OperationService } from "./operations/service.js";
-import { loadInstance } from "./operations/store.js";
+import { loadInstance, unfinishedOperations } from "./operations/store.js";
 import { maskClientId } from "./status.js";
 import type { StoreClient } from "./storeClient.js";
 import { startSync, type SyncResult } from "./sync.js";
@@ -160,6 +160,20 @@ export class AuraService {
   }
 
   /**
+   * Removes what came from Aura (the tenants, their instance options and every instance) and reads it in again. The Aura
+   * credentials, past operations, stored passwords and sync history are kept (see `SecretStore.clearAuraCopy`). Nothing changes in Aura.
+   * Refused while a sync or a change is under way, because both would be working on what is being removed.
+   */
+  async resetStore(): Promise<{ started: boolean; runId: string; removed: { tenants: number; options: number; instances: number } }> {
+    if (!(await this.o.secrets.hasAuraSecret(this.o.accountId))) throw new UserError("Connect an Aura account first.");
+    if (this.running) throw new UserError("A sync is running. Wait for it to finish, then reset the store.");
+    if ((await unfinishedOperations(this.o.store)).length > 0) throw new UserError("A change to an instance is in progress. Wait for it to finish, then reset the store.");
+    const removed = await this.o.secrets.clearAuraCopy(this.o.accountId);
+    const started = await this.startOnce();
+    return { ...started, removed };
+  }
+
+  /**
    * Shows an instance's stored password, once per call, and records that it was shown. The only place a password leaves the store.
    * `by` is who asked; there is no sign-in yet, so it says so.
    */
@@ -203,12 +217,22 @@ export class AuraService {
 
   private async startOnce(): Promise<{ started: boolean; runId: string }> {
     if (this.running) return { started: false, runId: this.running.runId };
-    const { runId, done } = await startSync({
+    const started = await startSync({
       aura: this.auraClient(),
       store: this.o.store,
       accountId: this.o.accountId,
       concurrency: this.o.syncConcurrency,
       now: this.o.now,
+    });
+    const runId = started.runId;
+    // After every sync, put back any link a reset took away. The sync only counts as finished once that is done.
+    const done = started.done.then(async (result) => {
+      try {
+        await this.o.secrets.relinkAfterReset();
+      } catch {
+        // the next sync tries again
+      }
+      return result;
     });
     this.running = { runId, done };
     void done.finally(() => {
